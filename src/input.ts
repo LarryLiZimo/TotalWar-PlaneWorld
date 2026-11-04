@@ -9,6 +9,7 @@ import {
   commandWidth,
   endWidth,
   filesForLateral,
+  narrowestFiles,
   widestFiles,
 } from './sim/orders'
 import type { Battle } from './sim/types'
@@ -129,7 +130,7 @@ export function attachInput(
       if (!reg) return
       const axis = right(reg.facing)
       const lateral = (point.x - reg.anchorX) * axis.x + (point.y - reg.anchorY) * axis.y
-      commandWidth(battle, reg.id, filesForLateral(unitDef(reg.type).spacing, lateral, widestFiles(reg)))
+      commandWidth(battle, reg.id, filesForLateral(unitDef(reg.type).spacing, lateral, widestFiles(reg), narrowestFiles(reg)))
       return
     }
     const moved = Math.hypot(point.sx - session.sx, point.sy - session.sy)

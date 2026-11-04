@@ -59,8 +59,22 @@ export function isBracing(reg: Regiment, def: UnitDef, towardX: number, towardY:
   if (!def.canBrace || reg.routing) return false
   if (reg.aliveCount <= reg.initial * 0.5) return false
   if (reg.stationaryTime < 1.5) return false
-  const to = Math.atan2(towardY - reg.anchorY, towardX - reg.anchorX)
-  return Math.abs(angDiff(reg.facing, to)) <= (35 * Math.PI) / 180
+  return beforeFront(reg, def, towardX, towardY)
+}
+
+/**
+ * Whether a point is out ahead of the block's front rank: across its width, widening 35° to each side.
+ * Something that has already broken past the front rank is in among the men and meets no brace.
+ */
+function beforeFront(reg: Regiment, def: UnitDef, x: number, y: number): boolean {
+  const fwd = forward(reg.facing)
+  const dx = x - reg.anchorX
+  const dy = y - reg.anchorY
+  const ahead = dx * fwd.x + dy * fwd.y
+  if (ahead < 0) return false
+  const side = Math.abs(dx * fwd.y - dy * fwd.x)
+  const half = ((reg.files - 1) * def.spacing) / 2 + def.radius
+  return side <= half + ahead * Math.tan((35 * Math.PI) / 180)
 }
 
 export function maxRankOf(reg: Regiment): number {
@@ -185,9 +199,14 @@ function formationSlots(
   return slots
 }
 
-/** Files a unit of `alive` men can actually stand in: no wider than its type allows or than it has men. */
+/**
+ * Files a unit of `alive` men can actually stand in: no wider than its type allows or than it has men,
+ * and no narrower than its type's deepest column allows.
+ */
 export function fileCount(def: UnitDef, files: number, alive: number): number {
-  return clamp(Math.round(files), 1, Math.max(1, Math.min(alive, def.maxFiles)))
+  const widest = Math.max(1, Math.min(alive, def.maxFiles))
+  const narrowest = Math.min(widest, Math.max(1, Math.ceil(alive / def.maxRanks)))
+  return clamp(Math.round(files), narrowest, widest)
 }
 
 export function assignFormation(reg: Regiment, files: number, ordered?: Soldier[]): void {

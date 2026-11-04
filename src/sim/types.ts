@@ -3,7 +3,17 @@ export const MAP_HEIGHT = 230
 export const SIM_DT = 0.05
 
 export type Side = 0 | 1
-export type UnitType = 'spear' | 'sword' | 'greatsword' | 'heavyCavalry' | 'lightCavalry' | 'archer' | 'musket' | 'chariot'
+export type UnitType =
+  | 'spear'
+  | 'sword'
+  | 'greatsword'
+  | 'heavyCavalry'
+  | 'lightCavalry'
+  | 'archer'
+  | 'musket'
+  | 'chariot'
+  | 'general'
+  | 'inquisitor'
 export type OrderKind = 'hold' | 'move' | 'attack'
 export type Fatigue = 'fresh' | 'winded' | 'exhausted'
 
@@ -33,6 +43,8 @@ export interface UnitDef {
   files: number
   /** Widest the unit can stand, in files. */
   maxFiles: number
+  /** Deepest the unit can stand, in ranks. */
+  maxRanks: number
   hp: number
   meleeAttack: number
   meleeDefense: number

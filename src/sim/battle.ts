@@ -74,23 +74,39 @@ export function createBattle(seed = 20261103): Battle {
     soldierById: new Map(),
     aiEnabled: false,
   }
-  spawn(battle, 0, 'spear', '南军长矛', 118, 68, NORTH)
-  spawn(battle, 0, 'sword', '南军剑士', 150, 68, NORTH)
-  spawn(battle, 0, 'greatsword', '南军巨剑', 182, 68, NORTH)
-  spawn(battle, 0, 'archer', '南军弓箭', 148, 50, NORTH)
-  spawn(battle, 0, 'musket', '南军火枪', 92, 56, NORTH)
-  spawn(battle, 0, 'lightCavalry', '南军轻骑', 58, 70, NORTH)
-  spawn(battle, 0, 'heavyCavalry', '南军重骑', 242, 70, NORTH)
-  spawn(battle, 0, 'chariot', '南军战车', 210, 50, NORTH)
-  spawn(battle, 1, 'spear', '北军长矛', 54, 138, SOUTH)
-  spawn(battle, 1, 'sword', '北军剑士', 102, 138, SOUTH)
-  spawn(battle, 1, 'greatsword', '北军巨剑', 150, 138, SOUTH)
-  spawn(battle, 1, 'spear', '北军长矛二', 198, 138, SOUTH)
-  spawn(battle, 1, 'sword', '北军剑士二', 246, 138, SOUTH)
-  spawn(battle, 1, 'archer', '北军弓箭', 78, 166, SOUTH)
-  spawn(battle, 1, 'musket', '北军火枪', 126, 176, SOUTH)
-  spawn(battle, 1, 'heavyCavalry', '北军重骑', 174, 164, SOUTH)
-  spawn(battle, 1, 'chariot', '北军战车', 222, 172, SOUTH)
+  spawn(battle, 0, 'sword', '南军盾兵', 110, 74, NORTH)
+  spawn(battle, 0, 'sword', '南军盾兵二', 130, 74, NORTH)
+  spawn(battle, 0, 'sword', '南军盾兵三', 150, 74, NORTH)
+  spawn(battle, 0, 'sword', '南军盾兵四', 170, 74, NORTH)
+  spawn(battle, 0, 'sword', '南军盾兵五', 190, 74, NORTH)
+  spawn(battle, 0, 'greatsword', '南军巨剑', 130, 58, NORTH)
+  spawn(battle, 0, 'greatsword', '南军巨剑二', 150, 58, NORTH)
+  spawn(battle, 0, 'greatsword', '南军巨剑三', 170, 58, NORTH)
+  spawn(battle, 0, 'archer', '南军弓箭', 88, 42, NORTH)
+  spawn(battle, 0, 'archer', '南军弓箭二', 212, 42, NORTH)
+  spawn(battle, 0, 'musket', '南军火枪', 150, 40, NORTH)
+  spawn(battle, 0, 'lightCavalry', '南军轻骑', 48, 80, NORTH)
+  spawn(battle, 0, 'lightCavalry', '南军轻骑二', 70, 80, NORTH)
+  spawn(battle, 0, 'lightCavalry', '南军轻骑三', 230, 80, NORTH)
+  spawn(battle, 0, 'lightCavalry', '南军轻骑四', 252, 80, NORTH)
+  spawn(battle, 0, 'heavyCavalry', '南军重骑', 52, 56, NORTH)
+  spawn(battle, 0, 'chariot', '南军战车', 248, 56, NORTH)
+  spawn(battle, 0, 'inquisitor', '南军审判官', 160, 66, NORTH)
+  spawn(battle, 0, 'general', '南军将军', 214, 64, NORTH)
+  spawn(battle, 1, 'spear', '北军矛兵', 95, 148, SOUTH)
+  spawn(battle, 1, 'spear', '北军矛兵二', 117, 148, SOUTH)
+  spawn(battle, 1, 'spear', '北军矛兵三', 139, 148, SOUTH)
+  spawn(battle, 1, 'spear', '北军矛兵四', 161, 148, SOUTH)
+  spawn(battle, 1, 'spear', '北军矛兵五', 183, 148, SOUTH)
+  spawn(battle, 1, 'spear', '北军矛兵六', 205, 148, SOUTH)
+  spawn(battle, 1, 'greatsword', '北军巨剑', 106, 164, SOUTH)
+  spawn(battle, 1, 'greatsword', '北军巨剑二', 128, 164, SOUTH)
+  spawn(battle, 1, 'greatsword', '北军巨剑三', 150, 164, SOUTH)
+  spawn(battle, 1, 'greatsword', '北军巨剑四', 172, 164, SOUTH)
+  spawn(battle, 1, 'greatsword', '北军巨剑五', 194, 164, SOUTH)
+  spawn(battle, 1, 'heavyCavalry', '北军重骑', 114, 186, SOUTH)
+  spawn(battle, 1, 'heavyCavalry', '北军重骑二', 150, 186, SOUTH)
+  spawn(battle, 1, 'heavyCavalry', '北军重骑三', 186, 186, SOUTH)
   return battle
 }
 
@@ -286,6 +302,13 @@ function applyAi(battle: Battle, dt: number): void {
   }
 }
 
+/**
+ * How far a chariot that has driven through a unit runs on past the far side of its ranks, or of the men it
+ * threw who still lie on the ground, before it pulls up. So it does not stop among them as they get up; men
+ * already back on their feet do not lead it on.
+ */
+const PLOW_OVERRUN = 6
+
 function updateAttackDest(battle: Battle, reg: Regiment): void {
   if (reg.targetId === null) return
   const target = regimentById(battle, reg.targetId)
@@ -299,8 +322,16 @@ function updateAttackDest(battle: Battle, reg: Regiment): void {
   const def = unitDef(reg.type)
   if (reg.plow > 0) {
     const fwd = forward(reg.facing)
-    reg.destX = clamp(reg.anchorX + fwd.x * 14, 3, MAP_WIDTH - 3)
-    reg.destY = clamp(reg.anchorY + fwd.y * 14, 3, MAP_HEIGHT - 3)
+    const targetDef = unitDef(target.type)
+    let far = -Infinity
+    for (const foe of target.soldiers) {
+      if (!foe.alive) continue
+      const at = foe.down > 0 ? foe : slotOf(target, targetDef, foe.file, foe.rank, foe.centerIndex)
+      far = Math.max(far, (at.x - reg.anchorX) * fwd.x + (at.y - reg.anchorY) * fwd.y)
+    }
+    const run = Math.max(far + PLOW_OVERRUN, 0.5)
+    reg.destX = clamp(reg.anchorX + fwd.x * run, 3, MAP_WIDTH - 3)
+    reg.destY = clamp(reg.anchorY + fwd.y * run, 3, MAP_HEIGHT - 3)
     reg.destFacing = reg.facing
     reg.facingLocked = true
     return
@@ -375,7 +406,7 @@ function moveSpeedOf(reg: Regiment, soldier?: Soldier): number {
   let speed = (reg.wantCharge && !reg.routing ? def.chargeSpeed : def.speed) * mods.stat
   if (reg.routing) speed *= 1.1
   if (reg.braceSlow > 0) speed = Math.min(speed, 1.5)
-  if (reg.bogged && reg.inContact) speed = Math.min(speed, 1.8)
+  if (reg.bogged && reg.inContact && reg.order !== 'move') speed = Math.min(speed, 1.8)
   if (soldier && soldier.disengage > 0) speed *= 0.55
   return speed
 }
@@ -429,6 +460,29 @@ function drive(
   return { facing: facing + omega * dt, omega, forward: forwardSpeed }
 }
 
+/** Enemies further than this do not steer a rout. */
+const FLEE_AWARE = 80
+
+/**
+ * A routing unit runs for its own side of the field and away from every enemy near it, the closer the harder.
+ * Summing them keeps a unit caught between enemies from flipping its heading as the nearest one changes.
+ */
+function fleeHeading(battle: Battle, reg: Regiment): number {
+  let fx = 0
+  let fy = reg.side === 0 ? -1 : 1
+  for (const other of battle.regiments) {
+    if (other.side === reg.side || other.aliveCount <= 0 || other.routing) continue
+    const dx = reg.anchorX - other.anchorX
+    const dy = reg.anchorY - other.anchorY
+    const d = Math.hypot(dx, dy)
+    if (d > FLEE_AWARE || d < 1e-3) continue
+    const push = 30 / Math.max(d, 8)
+    fx += (dx / d) * push
+    fy += (dy / d) * push
+  }
+  return Math.atan2(fy, fx)
+}
+
 /** Past this, the block does not wheel. Every soldier turns on the spot and the ranks re-form facing the new way. */
 const REFORM_TURN = 45 * DEG
 
@@ -453,14 +507,7 @@ function moveRegiments(battle: Battle, dt: number): void {
     }
     const def = unitDef(reg.type)
     if (reg.routing) {
-      const threat = nearestEnemyRegiment(battle, reg)
-      let dx = 0
-      let dy = reg.side === 0 ? -1 : 1
-      if (threat) {
-        dx = reg.anchorX - threat.anchorX
-        dy = reg.anchorY - threat.anchorY
-      }
-      relaid = march(reg, def, Math.atan2(dy, dx), Infinity, dt, 0.5)
+      relaid = march(reg, def, fleeHeading(battle, reg), Infinity, dt, 0.5)
       reg.destX = reg.anchorX
       reg.destY = reg.anchorY
       reg.destFacing = reg.facing
@@ -511,7 +558,7 @@ function march(reg: Regiment, def: UnitDef, heading: number, distance: number, d
   const aim = reg.routing ? heading : travelFacing(def, reg.destFacing, heading)
   const err = angDiff(reg.facing, aim)
   const closing = reg.order === 'attack' && !def.missile && distance < releaseRange(def) * 2
-  if (!closing && Math.abs(err) > REFORM_TURN) {
+  if (!closing && !reg.routing && Math.abs(err) > REFORM_TURN) {
     if (footed) {
       reformMoving(reg, reg.files, aim)
     } else {
@@ -538,11 +585,12 @@ function march(reg: Regiment, def: UnitDef, heading: number, distance: number, d
   const maxOmega = Math.min(top / (2 * lever), (reg.anchorSpeed + 0.3) / lever)
   const wantOmega = Math.abs(err) < 0.02 ? 0 : clamp(err * 2.5, -maxOmega, maxOmega)
   const omega = clamp(approach(reg.turnRate, wantOmega, Math.max(0.05, maxOmega * 1.5), dt), -maxOmega, maxOmega)
-  const target = Math.max(0, top - Math.abs(omega) * lever)
+  let target = Math.max(0, top - Math.abs(omega) * lever)
+  if (reg.plow > 0) target = Math.min(target, Math.sqrt(2 * accelRate(def, false) * distance))
   reg.anchorSpeed = approach(reg.anchorSpeed, target, accelRate(def, target > reg.anchorSpeed), dt)
   reg.facing += omega * dt
   const fwd = forward(reg.facing)
-  const stepDist = Math.min(reg.anchorSpeed * dt, distance)
+  const stepDist = reg.plow > 0 ? reg.anchorSpeed * dt : Math.min(reg.anchorSpeed * dt, distance)
   reg.anchorX = clamp(reg.anchorX + fwd.x * stepDist, 3, MAP_WIDTH - 3)
   reg.anchorY = clamp(reg.anchorY + fwd.y * stepDist, 3, MAP_HEIGHT - 3)
   return false
@@ -830,12 +878,40 @@ function followSlot(
     standBy(reg, def, s, gait, lever, dt, brake)
     return
   }
+  if (still && def.turnRadius === 0 && distance < BACK_STEP_RANGE && Math.abs(angDiff(reg.facing, heading)) > 100 * DEG) {
+    backStep(reg, def, s, heading, Math.min(want, gait * BACK_STEP_PACE), gait, lever, dt, distance)
+    return
+  }
   steer(def, s, heading, Math.min(want, top), top, lever, dt, distance + slotSpeed * dt + 0.02, distance)
+}
+
+/** A man on foot this close to a slot behind a standing block backs into it rather than turning his back. */
+const BACK_STEP_RANGE = 12
+/** Backing up goes at this share of the walking pace. */
+const BACK_STEP_PACE = 0.7
+
+/** Shuffle back toward a slot while turning to face the block's front, so a block never stands facing out. */
+function backStep(
+  reg: Regiment,
+  def: UnitDef,
+  s: Soldier,
+  heading: number,
+  pace: number,
+  gait: number,
+  lever: number,
+  dt: number,
+  distance: number,
+): void {
+  rotate(def, s, angDiff(s.facing, reg.facing), gait, lever, dt)
+  s.speed = approach(s.speed, 0, accelRate(def, false), dt)
+  const stride = Math.min(pace * dt, distance)
+  s.x += Math.cos(heading) * stride
+  s.y += Math.sin(heading) * stride
 }
 
 /** How much faster than the marching pace a man out of place may go to reach his slot. */
 function catchUpOf(reg: Regiment, def: UnitDef): number {
-  if (reg.braceSlow > 0 || reg.bogged) return 1
+  if (reg.braceSlow > 0 || (reg.bogged && reg.order !== 'move')) return 1
   if (reg.wantCharge) return 1.15
   return Math.max(1.5, def.chargeSpeed / def.speed)
 }
@@ -1012,6 +1088,7 @@ function resolveMelee(battle: Battle, live: Live[], grid: Spatial, buf: number[]
       else if (arc === 'flank') item.reg.touchFlank = true
       const to = Math.atan2(other.s.y - item.s.y, other.s.x - item.s.x)
       if (Math.abs(angDiff(item.s.facing, to)) > 70 * DEG) continue
+      if (runningDown(item, other)) continue
       if (gap < targetGap) {
         target = other
         targetGap = gap
@@ -1033,14 +1110,33 @@ function resolveMelee(battle: Battle, live: Live[], grid: Spatial, buf: number[]
   }
 }
 
+/**
+ * A man on foot about to be run down by a horse or chariot has no time to strike at it, unless he is an
+ * anti-large spearman standing braced for the charge. Only what drives into him at ramming speed counts;
+ * a rider going past at his side can be cut.
+ */
+function runningDown(item: Live, other: Live): boolean {
+  if (item.def.large || !other.def.large) return false
+  const dx = item.s.x - other.s.x
+  const dy = item.s.y - other.s.y
+  const apart = Math.hypot(dx, dy) || 1
+  const closing = ((other.s.vx - item.s.vx) * dx + (other.s.vy - item.s.vy) * dy) / apart
+  if (closing <= 5) return false
+  return item.def.antiLargeMa <= 0 || !isBracing(item.reg, item.def, other.s.x, other.s.y)
+}
+
+/** A man must himself be going at his man at least this fast to strike with a charge; standing, he has none. */
+const CHARGING_PACE = 1
+
 function landMelee(battle: Battle, item: Live, target: Live): void {
   item.s.meleeCd = item.def.meleeInterval
   const mods = fatigueMods(item.reg.fatigue)
   const dx = target.s.x - item.s.x
   const dy = target.s.y - item.s.y
   const apart = Math.hypot(dx, dy) || 1
+  const rushing = (item.s.vx * dx + item.s.vy * dy) / apart > CHARGING_PACE
   const closing = ((item.s.vx - target.s.vx) * dx + (item.s.vy - target.s.vy) * dy) / apart
-  const charge = item.def.chargeBonus * mods.stat * chargeShare(closing, item.def.chargeSpeed * mods.stat)
+  const charge = rushing ? item.def.chargeBonus * mods.stat * chargeShare(closing, item.def.chargeSpeed * mods.stat) : 0
   let attack = item.def.meleeAttack * mods.stat + charge
   if (target.def.large) attack += item.def.antiLargeMa
   else if (isInfantry(target.def.type)) attack += item.def.antiInfantryMa
@@ -1278,13 +1374,17 @@ function flyArc(battle: Battle, projectile: Projectile, live: Live[], dt: number
   hurt(battle, best, source, projectile.base, projectile.ap, false)
 }
 
-/** A braced front stops the charge flat. The men stay on their feet. */
-function pinBrace(item: Live): void {
-  item.reg.plow = 0
-  const current = Math.hypot(item.s.vx, item.s.vy) || 1
-  item.s.vx = (item.s.vx / current) * 2
-  item.s.vy = (item.s.vy / current) * 2
-  item.reg.braceSlow = Math.max(item.reg.braceSlow, 1.6)
+/** Share of a charger's speed each braced man he strikes takes off him. */
+const BRACE_BLEED = 0.08
+
+/**
+ * A braced front blunts a charge but does not stop it flat: the men are still bowled over, but each one struck
+ * costs the charger some of his speed. Once past the front rank he meets no brace.
+ */
+function braceAgainst(item: Live): void {
+  item.s.vx *= 1 - BRACE_BLEED
+  item.s.vy *= 1 - BRACE_BLEED
+  item.s.speed *= 1 - BRACE_BLEED
 }
 
 function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[]): void {
@@ -1321,13 +1421,13 @@ function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[
       const nx = dx / distance
       const ny = dy / distance
       const closing = (item.s.vx - hit.item.s.vx) * nx + (item.s.vy - hit.item.s.vy) * ny
-      if (closing <= 5) continue
+      if (closing <= 5 || hit.item.s.down > 0) continue
       const braced = isBracing(hit.item.reg, hit.item.def, item.s.x, item.s.y)
       const arc = facingArc(hit.item.reg.facing, hit.item.s.x, hit.item.s.y, item.s.x, item.s.y)
       const foot = !hit.item.def.large
-      const sprawl = foot && (!braced || arc === 'rear')
-      if (braced) pinBrace(item)
-      else if (item.def.type === 'chariot' && foot) item.reg.plow = Math.max(item.reg.plow, PLOW_TIME)
+      const sprawl = foot
+      if (braced) braceAgainst(item)
+      if (item.def.type === 'chariot' && foot) item.reg.plow = Math.max(item.reg.plow, PLOW_TIME)
       if (hit.item.s.down > 0) continue
       const room = item.s.cleave < item.def.cleave
       if (room) {
@@ -1383,12 +1483,19 @@ function separate(live: Live[], pad: Scratch): void {
         const enemy = a.reg.side !== b.reg.side
         const plowA = enemy && a.def.type === 'chariot' && a.reg.plow > 0
         const plowB = enemy && b.def.type === 'chariot' && b.reg.plow > 0
+        const onFoot = enemy && !a.def.large && !b.def.large
+        const yieldA = onFoot ? footYield(a, b, nx, ny) : 0
         if (plowA && !plowB) {
           b.s.x += nx * push
           b.s.y += ny * push
         } else if (plowB && !plowA) {
           a.s.x -= nx * push
           a.s.y -= ny * push
+        } else if (onFoot) {
+          a.s.x -= nx * push * yieldA
+          a.s.y -= ny * push * yieldA
+          b.s.x += nx * push * (1 - yieldA)
+          b.s.y += ny * push * (1 - yieldA)
         } else {
           a.s.x -= nx * push * (massB / total)
           a.s.y -= ny * push * (massB / total)
@@ -1396,7 +1503,12 @@ function separate(live: Live[], pad: Scratch): void {
           b.s.y += ny * push * (massA / total)
         }
         const relVn = (b.s.vx - a.s.vx) * nx + (b.s.vy - a.s.vy) * ny
-        if (relVn < 0 && enemy) {
+        if (relVn < 0 && onFoot) {
+          a.s.vx += nx * relVn * yieldA
+          a.s.vy += ny * relVn * yieldA
+          b.s.vx -= nx * relVn * (1 - yieldA)
+          b.s.vy -= ny * relVn * (1 - yieldA)
+        } else if (relVn < 0 && enemy) {
           const impulse = -relVn / (1 / massA + 1 / massB)
           const keepA = plowA ? 0.05 : 1
           const keepB = plowB ? 0.05 : 1
@@ -1408,6 +1520,19 @@ function separate(live: Live[], pad: Scratch): void {
       }
     }
   }
+}
+
+/**
+ * Share of the overlap between two enemy foot soldiers that `a` gives way by. A man on foot cannot shove an
+ * enemy man on foot: whoever walks into the other is stopped and slides off him; the one standing does not
+ * budge. When neither is moving, the side on the attack gives way, so a ring of attackers never crushes a block.
+ */
+function footYield(a: Live, b: Live, nx: number, ny: number): number {
+  const into = (item: Live, sign: number) =>
+    Math.max(0, sign * (item.s.vx * nx + item.s.vy * ny)) + (item.reg.order === 'attack' ? 0.05 : 0) + 0.01
+  const wa = into(a, 1)
+  const wb = into(b, -1)
+  return wa / (wa + wb)
 }
 
 /** Two comrades who walk into each other on the way to each other's side trade places instead of jamming. */
@@ -1481,7 +1606,7 @@ function finishChargeFatigueBog(battle: Battle, live: Live[], pad: Scratch, dt: 
       if (reg.inContact && slow && reg.plow <= 0) reg.bogTime += dt
       else if (!reg.inContact) reg.bogTime = Math.max(0, reg.bogTime - dt)
       if (reg.bogTime >= 2) reg.bogged = true
-      if (reg.bogged && !reg.inContact && reg.anchorSpeed > 8) {
+      if (reg.bogged && !reg.inContact && (reg.anchorSpeed > 8 || reg.order === 'move')) {
         reg.bogged = false
         reg.bogTime = 0
       }
@@ -1576,7 +1701,7 @@ function checkVictory(battle: Battle): void {
 
 function collisionMass(item: Live, otherX: number, otherY: number): number {
   if (item.s.down > 0) return item.def.mass * 0.3
-  if (isBracing(item.reg, item.def, otherX, otherY)) return item.def.mass * 6
+  if (isBracing(item.reg, item.def, otherX, otherY)) return item.def.mass * 3
   return item.def.mass
 }
 
@@ -1594,7 +1719,7 @@ function knockDown(
   vy: number,
 ): void {
   const heft = Math.min(2.1, Math.sqrt(attackerMass / 480))
-  const launch = Math.min(32, Math.max(18, closing * 1.55 * heft))
+  const launch = Math.min(12, Math.max(8, closing * 0.8 * heft))
   const speed = Math.hypot(vx, vy)
   let fx = nx
   let fy = ny

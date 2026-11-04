@@ -129,14 +129,19 @@ export function endWidth(battle: Battle, id: number): void {
   battle.widthOrder.delete(id)
 }
 
-export function filesForLateral(spacing: number, lateral: number, widest: number): number {
-  return clamp(Math.round((2 * Math.abs(lateral)) / spacing) + 1, 1, Math.max(1, widest))
+export function filesForLateral(spacing: number, lateral: number, widest: number, narrowest = 1): number {
+  return clamp(Math.round((2 * Math.abs(lateral)) / spacing) + 1, Math.min(narrowest, widest), Math.max(1, widest))
 }
 
 /** The most files this regiment can stand in right now. */
 export function widestFiles(reg: Regiment): number {
   const def = unitDef(reg.type)
   return fileCount(def, def.maxFiles, reg.aliveCount)
+}
+
+/** The fewest files this regiment can stand in right now without its column running deeper than its type allows. */
+export function narrowestFiles(reg: Regiment): number {
+  return fileCount(unitDef(reg.type), 1, reg.aliveCount)
 }
 
 export interface FrontPreview {
@@ -177,7 +182,7 @@ function planFront(reg: Regiment, x1: number, y1: number, x2: number, y2: number
   const widest = widestFiles(reg)
   const line = clampFrontLine(x1, y1, x2, y2, def.spacing, widest)
   if (line.length < 0.8) return null
-  const files = clamp(Math.floor(line.length / def.spacing + 1e-4) + 1, 1, widest)
+  const files = clamp(Math.floor(line.length / def.spacing + 1e-4) + 1, narrowestFiles(reg), widest)
   const width = (files - 1) * def.spacing
   const alongX = (line.x2 - line.x1) / line.length
   const alongY = (line.y2 - line.y1) / line.length
@@ -185,6 +190,7 @@ function planFront(reg: Regiment, x1: number, y1: number, x2: number, y2: number
   const anchorY = line.y1 + alongY * (width / 2)
   const dragX = x2 - x1
   const dragY = y2 - y1
+  const shown = Math.max(line.length, width)
   return {
     x: anchorX,
     y: anchorY,
@@ -192,8 +198,8 @@ function planFront(reg: Regiment, x1: number, y1: number, x2: number, y2: number
     files,
     x1: line.x1,
     y1: line.y1,
-    x2: line.x2,
-    y2: line.y2,
+    x2: line.x1 + alongX * shown,
+    y2: line.y1 + alongY * shown,
   }
 }
 

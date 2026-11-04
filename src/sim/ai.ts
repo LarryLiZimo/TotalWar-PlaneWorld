@@ -1,7 +1,7 @@
 import { isBracing } from './formation'
 import { distPointToSegment } from './math'
 import type { Battle, OrderKind, Regiment } from './types'
-import { isCavalry, isInfantry, unitDef } from './units'
+import { isCavalry, isInfantry, isRangedInfantry, unitDef } from './units'
 
 export interface AiIntent {
   regId: number
@@ -79,7 +79,7 @@ function decide(battle: Battle, reg: Regiment): AiIntent | null {
     return intent(reg, 'attack', foe.anchorX, foe.anchorY, facing, foe.id, `attack:${foe.id}`)
   }
 
-  if (unitDef(reg.type).missile) {
+  if (isRangedInfantry(reg.type)) {
     const missile = unitDef(reg.type).missile!
     const foe = nearest(reg, players)
     if (!foe) return null
@@ -105,10 +105,10 @@ function decide(battle: Battle, reg: Regiment): AiIntent | null {
     return intent(reg, 'move', behindX, behindY, facing, null, `follow:${reg.type}:${Math.round(behindX / 2)}:${Math.round(behindY / 2)}`)
   }
 
-  const ranged = players.filter((other) => unitDef(other.type).missile)
+  const ranged = players.filter((other) => isRangedInfantry(other.type))
   const prey = ranged.find((other) => other.type === 'archer') ?? ranged[0] ?? nearest(reg, players)
   if (!prey) return null
-  if (unitDef(prey.type).missile && blockedByBrace(battle, reg, prey)) {
+  if (isRangedInfantry(prey.type) && blockedByBrace(battle, reg, prey)) {
     const flank = standing(battle, 0).find((other) => isCavalry(other.type)) ?? players[players.length - 1]
     const facing = Math.atan2(flank.anchorY - reg.anchorY, flank.anchorX - reg.anchorX)
     return intent(reg, 'attack', flank.anchorX, flank.anchorY, facing, flank.id, `flank:${flank.id}`)

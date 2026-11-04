@@ -28,7 +28,7 @@ describe('combat formulas', () => {
   it('scales impact by mass, speed, and brace', () => {
     expect(impactRaw(70, 5, 480, 110, false)).toBe(0)
     expect(impactRaw(70, 13, 480, 110, false)).toBeCloseTo(80.09, 1)
-    expect(impactRaw(70, 13, 480, 110, true)).toBeCloseTo(24.03, 1)
+    expect(impactRaw(70, 13, 480, 110, true)).toBeCloseTo(56.06, 1)
     expect(impactRaw(70, 13, 110, 480, false)).toBeLessThan(impactRaw(70, 13, 480, 110, false))
   })
 
@@ -102,9 +102,9 @@ describe('rear rank', () => {
   it('stands the short last rank in the center', () => {
     const battle = createBattle(1)
     const reg = battle.regiments[0]
-    assignFormation(reg, 6)
+    assignFormation(reg, 9)
     const rear = reg.soldiers.filter((soldier) => soldier.alive && soldier.centerIndex >= 0)
-    expect(rear).toHaveLength(80 % 6)
+    expect(rear).toHaveLength(80 % 9)
     const rank = rear[0].rank
     const left = slotOf(reg, UNITS[reg.type], 0, rank, 0)
     const right = slotOf(reg, UNITS[reg.type], 0, rank, rear.length - 1)
@@ -116,10 +116,10 @@ describe('rear rank', () => {
 describe('battle', () => {
   it('opens with both armies already formed', () => {
     const battle = createBattle(1)
-    expect(battle.regiments).toHaveLength(17)
+    expect(battle.regiments).toHaveLength(33)
     const men = battle.regiments.reduce((sum, reg) => sum + reg.initial, 0)
-    expect(men).toBe(956)
-    expect(battle.regiments.filter((reg) => reg.side === 1 && (reg.type === 'spear' || reg.type === 'sword' || reg.type === 'greatsword'))).toHaveLength(5)
+    expect(men).toBe(1974)
+    expect(battle.regiments.filter((reg) => reg.side === 1 && (reg.type === 'spear' || reg.type === 'sword' || reg.type === 'greatsword'))).toHaveLength(11)
     expect(battle.aiEnabled).toBe(false)
     expect(battle.regiments.filter((reg) => reg.type === 'chariot')[0].initial).toBe(4)
     expect(battle.regiments.every((reg) => reg.order === 'hold')).toBe(true)
@@ -147,11 +147,11 @@ describe('battle', () => {
         expect(Number.isFinite(soldier.hp)).toBe(true)
       }
     }
-    const enemy = battle.regiments.find((reg) => reg.name === '北军长矛')
+    const enemy = battle.regiments.find((reg) => reg.name === '北军矛兵')
     expect(enemy).toBeTruthy()
-    expect(enemy!.anchorY).toBeCloseTo(138, 0)
+    expect(enemy!.anchorY).toBeCloseTo(148, 0)
     expect(totalHp(battle)).toBe(startHp)
-  })
+  }, 25000)
 
   it('lets a chariot rear charge collision throw infantry and drive through without killing them', () => {
     const bonus = UNITS.chariot.chargeBonus
@@ -179,13 +179,13 @@ describe('battle', () => {
     const charged = chariotRearCharge()
     expect(totalHp(charged.battle)).toBeLessThan(plain)
     expect(charged.flung).toBeGreaterThan(8)
-  })
+  }, 25000)
 })
 
 function chariotRearCharge() {
   const battle = createBattle(3)
   const chariot = battle.regiments.find((reg) => reg.name === '南军战车')!
-  const infantry = battle.regiments.find((reg) => reg.name === '北军长矛二')!
+  const infantry = battle.regiments.find((reg) => reg.name === '北军矛兵二')!
   const north = Math.PI / 2
   let park = 0
   for (const reg of battle.regiments) {

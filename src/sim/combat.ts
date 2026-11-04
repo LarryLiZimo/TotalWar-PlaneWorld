@@ -34,7 +34,7 @@ export function impactRaw(
   const massFactor = massAttacker / (massAttacker + massTarget)
   const speedFactor = Math.pow(closing / 10, 1.3)
   let raw = power * speedFactor * massFactor
-  if (braced) raw *= 0.3
+  if (braced) raw *= 0.7
   return raw
 }
 

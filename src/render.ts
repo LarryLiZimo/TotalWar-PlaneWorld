@@ -356,6 +356,34 @@ function drawSoldier(
     ctx.stroke()
     if (!dead) drawNose(ctx, length / 2, breadth * 0.42, breadth * 0.55, reg)
     ctx.restore()
+  } else if (def.type === 'general') {
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.rotate(-soldier.facing)
+    ctx.ellipse(0, 0, radius * 1.55, radius * 0.95, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(radius * 0.15, -radius * 0.15, radius * 0.42, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+    if (!dead) drawNose(ctx, radius * 1.55, radius * 0.55, radius * 0.7, reg)
+    ctx.restore()
+  } else if (def.type === 'inquisitor') {
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+    if (!dead) {
+      const px = Math.cos(soldier.facing)
+      const py = -Math.sin(soldier.facing)
+      ctx.beginPath()
+      ctx.moveTo(p.x - py * radius * 0.7, p.y - px * radius * 0.7)
+      ctx.lineTo(p.x + py * radius * 0.7, p.y + px * radius * 0.7)
+      ctx.moveTo(p.x, p.y)
+      ctx.lineTo(p.x + px * (radius + 6), p.y + py * (radius + 6))
+      ctx.stroke()
+    }
   } else if (isCavalry(def.type)) {
     ctx.save()
     ctx.translate(p.x, p.y)
@@ -391,7 +419,7 @@ function drawSoldier(
     ctx.fill()
     ctx.stroke()
   }
-  if (!dead && !isCavalry(def.type) && def.type !== 'chariot' && def.type !== 'musket') {
+  if (!dead && !isCavalry(def.type) && def.type !== 'chariot' && def.type !== 'musket' && def.type !== 'inquisitor') {
     const reach = def.type === 'spear' ? radius + 7 : def.type === 'greatsword' ? radius + 5 : radius + 2
     const fx = Math.cos(soldier.facing) * reach
     const fy = -Math.sin(soldier.facing) * reach
