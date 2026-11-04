@@ -1,0 +1,154 @@
+:root {
+  color-scheme: dark;
+  --bg: #141812;
+  --panel: rgba(18, 22, 16, 0.88);
+  --line: rgba(224, 194, 122, 0.35);
+  --text: #e7e1d1;
+  --muted: #b3aa96;
+  --gold: #e0c27a;
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#view {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+#top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  max-width: calc(100% - 280px);
+}
+
+#top strong { font-weight: 500; }
+
+button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.on, button.row.on {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+#side {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 240px;
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  padding: 12px;
+}
+
+#side h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+#side p { margin: 0 0 8px; }
+
+.muted { color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.track div { height: 100%; }
+
+#roster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.row {
+  text-align: left;
+  padding: 6px 8px;
+}
+
+#help {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  margin: 0;
+  max-width: min(760px, calc(100% - 280px));
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+#notices {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+#notices li {
+  margin-top: 4px;
+  color: var(--gold);
+}
+
+#banner {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  padding: 16px 28px;
+  background: var(--panel);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  font-size: 28px;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  #side { width: 180px; }
+  #top { max-width: calc(100% - 200px); flex-wrap: wrap; }
+}
