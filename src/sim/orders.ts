@@ -1,4 +1,4 @@
-import { PLACE_RADIUS, assignFormation, enemyCentroid } from './formation'
+import { PLACE_RADIUS, assignFormation, fileCount, reformAt, reformMoving, travelFacing } from './formation'
 import { clamp } from './math'
 import type { Battle, Regiment } from './types'
 import { MAP_HEIGHT, MAP_WIDTH } from './types'
@@ -81,16 +81,23 @@ export function commandFront(
 ): void {
   const reg = regimentById(battle, id)
   if (!controllable(reg)) return
-  const planned = planFront(battle, reg, x1, y1, x2, y2)
+  const planned = planFront(reg, x1, y1, x2, y2)
   if (!planned) {
     commandMove(battle, [id], x2, y2, null)
     return
   }
   reg.destFacing = planned.facing
-  reg.destFiles = planned.files
   reg.order = 'move'
   reg.destX = place(planned.x, MAP_WIDTH)
   reg.destY = place(planned.y, MAP_HEIGHT)
+  const dx = reg.destX - reg.anchorX
+  const dy = reg.destY - reg.anchorY
+  const far = Math.hypot(dx, dy) > PLACE_RADIUS
+  if (clamp(planned.files, 1, reg.aliveCount) !== clamp(reg.files, 1, reg.aliveCount)) {
+    if (far) reformMoving(reg, planned.files, travelFacing(unitDef(reg.type), planned.facing, Math.atan2(dy, dx)))
+    else reformAt(reg, planned.files, planned.facing)
+  }
+  reg.destFiles = reg.files
   reg.facingLocked = true
   reg.targetId = null
   reg.wantCharge = false
@@ -122,8 +129,14 @@ export function endWidth(battle: Battle, id: number): void {
   battle.widthOrder.delete(id)
 }
 
-export function filesForLateral(spacing: number, lateral: number, alive: number): number {
-  return clamp(Math.round((2 * Math.abs(lateral)) / spacing) + 1, 1, Math.max(1, alive))
+export function filesForLateral(spacing: number, lateral: number, widest: number): number {
+  return clamp(Math.round((2 * Math.abs(lateral)) / spacing) + 1, 1, Math.max(1, widest))
+}
+
+/** The most files this regiment can stand in right now. */
+export function widestFiles(reg: Regiment): number {
+  const def = unitDef(reg.type)
+  return fileCount(def, def.maxFiles, reg.aliveCount)
 }
 
 export interface FrontPreview {
@@ -137,52 +150,45 @@ export interface FrontPreview {
   y2: number
 }
 
-/** Keep the leftmost end of the drag. The line stops at the widest rank the unit can fill. */
+/** The drag starts at the formation's left. The line stops at the widest rank the unit can stand in. */
 export function clampFrontLine(
   x1: number,
   y1: number,
   x2: number,
   y2: number,
   spacing: number,
-  alive: number,
+  widest: number,
 ): { x1: number; y1: number; x2: number; y2: number; length: number } {
   const len = Math.hypot(x2 - x1, y2 - y1)
-  const maxLen = Math.max(0, alive - 1) * spacing
+  const maxLen = Math.max(0, widest - 1) * spacing
   if (len < 1e-4) return { x1, y1, x2: x1, y2: y1, length: 0 }
-  const vertical = Math.abs(x2 - x1) <= 0.5
-  const leftX = vertical || x1 <= x2 ? x1 : x2
-  const leftY = vertical || x1 <= x2 ? y1 : y2
-  const rightX = leftX === x1 && leftY === y1 ? x2 : x1
-  const rightY = leftX === x1 && leftY === y1 ? y2 : y1
-  const full = Math.hypot(rightX - leftX, rightY - leftY) || 1
-  const use = Math.min(full, maxLen)
+  const use = Math.min(len, maxLen)
   return {
-    x1: leftX,
-    y1: leftY,
-    x2: leftX + ((rightX - leftX) / full) * use,
-    y2: leftY + ((rightY - leftY) / full) * use,
+    x1,
+    y1,
+    x2: x1 + ((x2 - x1) / len) * use,
+    y2: y1 + ((y2 - y1) / len) * use,
     length: use,
   }
 }
 
-function planFront(battle: Battle, reg: Regiment, x1: number, y1: number, x2: number, y2: number): FrontPreview | null {
+function planFront(reg: Regiment, x1: number, y1: number, x2: number, y2: number): FrontPreview | null {
   const def = unitDef(reg.type)
-  const line = clampFrontLine(x1, y1, x2, y2, def.spacing, reg.aliveCount)
+  const widest = widestFiles(reg)
+  const line = clampFrontLine(x1, y1, x2, y2, def.spacing, widest)
   if (line.length < 0.8) return null
-  const files = clamp(Math.floor(line.length / def.spacing + 1e-4) + 1, 1, reg.aliveCount)
+  const files = clamp(Math.floor(line.length / def.spacing + 1e-4) + 1, 1, widest)
   const width = (files - 1) * def.spacing
   const alongX = (line.x2 - line.x1) / line.length
   const alongY = (line.y2 - line.y1) / line.length
   const anchorX = line.x1 + alongX * (width / 2)
   const anchorY = line.y1 + alongY * (width / 2)
-  const n1x = -alongY
-  const n1y = alongX
-  const enemy = enemyCentroid(battle, reg.side)
-  const useFirst = n1x * (enemy.x - anchorX) + n1y * (enemy.y - anchorY) >= 0
+  const dragX = x2 - x1
+  const dragY = y2 - y1
   return {
     x: anchorX,
     y: anchorY,
-    facing: Math.atan2(useFirst ? n1y : -n1y, useFirst ? n1x : -n1x),
+    facing: Math.atan2(dragX, -dragY),
     files,
     x1: line.x1,
     y1: line.y1,
@@ -201,5 +207,5 @@ export function previewFront(
 ): FrontPreview | null {
   const reg = regimentById(battle, id)
   if (!reg) return null
-  return planFront(battle, reg, x1, y1, x2, y2)
+  return planFront(reg, x1, y1, x2, y2)
 }

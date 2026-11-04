@@ -1,6 +1,9 @@
 import { clamp } from './math'
 import type { Fatigue } from './types'
 
+/** How long a knocked-down foot soldier stays on the ground. */
+export const KNOCK_TIME = 2
+
 /** Melee hit chance in percent. Clamped to 8–90. */
 export function hitChance(meleeAttack: number, meleeDefense: number): number {
   return clamp(35 + meleeAttack - meleeDefense, 8, 90)
@@ -42,12 +45,10 @@ export function splitBonus(base: number, ap: number, bonus: number): { base: num
   return { base: bonus * (1 - ratio), ap: bonus * ratio }
 }
 
-/** Full bonus for 4s, then linear decay to 0 at 12s. */
-export function chargeScale(timer: number): number {
-  if (timer < 0) return 0
-  if (timer <= 4) return 1
-  if (timer >= 12) return 0
-  return 1 - (timer - 4) / 8
+/** Share of the charge bonus a blow carries: how fast the attacker closes on his man, against his own top speed. */
+export function chargeShare(closing: number, topSpeed: number): number {
+  if (topSpeed <= 0 || closing <= 0) return 0
+  return Math.min(closing / topSpeed, 1)
 }
 
 export function fatigueMods(level: Fatigue): { stat: number; reload: number } {

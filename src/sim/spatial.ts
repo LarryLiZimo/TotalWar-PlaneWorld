@@ -1,25 +1,44 @@
-/** Uniform grid of entity indices. Reused across queries with a stamp buffer. */
+import { MAP_HEIGHT, MAP_WIDTH } from './types'
+
+const MARGIN = 16
+
+/** Uniform grid of entity indices over the map. Points off the map share the border cells. */
 export class Spatial {
-  private buckets = new Map<string, number[]>()
+  private readonly cols: number
+  private readonly rows: number
+  private readonly buckets: number[][]
+  private readonly touched: number[] = []
   private seen: Uint32Array
   private token = 1
 
   constructor(
-    private cell = 6,
+    private cell = 2,
     capacity = 2048,
   ) {
+    this.cols = Math.ceil((MAP_WIDTH + MARGIN * 2) / cell)
+    this.rows = Math.ceil((MAP_HEIGHT + MARGIN * 2) / cell)
+    this.buckets = Array.from({ length: this.cols * this.rows }, () => [])
     this.seen = new Uint32Array(capacity)
   }
 
   clear(): void {
-    this.buckets.clear()
+    for (const index of this.touched) this.buckets[index].length = 0
+    this.touched.length = 0
+  }
+
+  private col(x: number): number {
+    return Math.min(this.cols - 1, Math.max(0, Math.floor((x + MARGIN) / this.cell)))
+  }
+
+  private row(y: number): number {
+    return Math.min(this.rows - 1, Math.max(0, Math.floor((y + MARGIN) / this.cell)))
   }
 
   insert(x: number, y: number, index: number): void {
-    const k = `${Math.floor(x / this.cell)},${Math.floor(y / this.cell)}`
-    const bucket = this.buckets.get(k)
-    if (bucket) bucket.push(index)
-    else this.buckets.set(k, [index])
+    const cell = this.row(y) * this.cols + this.col(x)
+    const bucket = this.buckets[cell]
+    if (bucket.length === 0) this.touched.push(cell)
+    bucket.push(index)
   }
 
   query(x: number, y: number, radius: number, out: number[]): void {
@@ -29,15 +48,16 @@ export class Spatial {
       this.seen.fill(0)
       this.token = 1
     }
-    const minX = Math.floor((x - radius) / this.cell)
-    const maxX = Math.floor((x + radius) / this.cell)
-    const minY = Math.floor((y - radius) / this.cell)
-    const maxY = Math.floor((y + radius) / this.cell)
-    for (let ix = minX; ix <= maxX; ix++) {
-      for (let iy = minY; iy <= maxY; iy++) {
-        const bucket = this.buckets.get(`${ix},${iy}`)
-        if (!bucket) continue
-        for (const index of bucket) {
+    const minX = this.col(x - radius)
+    const maxX = this.col(x + radius)
+    const minY = this.row(y - radius)
+    const maxY = this.row(y + radius)
+    for (let iy = minY; iy <= maxY; iy++) {
+      const rowStart = iy * this.cols
+      for (let ix = minX; ix <= maxX; ix++) {
+        const bucket = this.buckets[rowStart + ix]
+        for (let k = 0; k < bucket.length; k++) {
+          const index = bucket[k]
           if (index >= this.seen.length) continue
           if (this.seen[index] === this.token) continue
           this.seen[index] = this.token

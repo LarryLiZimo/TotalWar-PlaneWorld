@@ -1,23 +1,34 @@
-import { planEnemyIntents } from './ai'
+﻿import { planEnemyIntents } from './ai'
 import {
   accuracyAt,
   armorRoll,
-  chargeScale,
+  chargeShare,
   effectiveLeadership,
   fatigueMods,
   hitChance,
+  KNOCK_TIME,
   impactRaw,
   mitigate,
   splitBonus,
 } from './combat'
-import { PLACE_RADIUS, compactRanks, gapBetween, isBracing, reformAt, slotOf } from './formation'
+import {
+  PLACE_RADIUS,
+  compactRanks,
+  fitOnMap,
+  gapBetween,
+  isBracing,
+  reformAt,
+  reformMoving,
+  slotOf,
+  travelFacing,
+} from './formation'
 import { DEG, angDiff, clamp, facingArc, forward, mulberry32, rayCircleT } from './math'
 import { commandAttack, commandHold, commandMove, regimentById } from './orders'
 import { shapePoints } from './formation'
 import { Spatial } from './spatial'
 import type { Battle, Projectile, Regiment, Side, Soldier, UnitDef, UnitType } from './types'
 import { MAP_HEIGHT, MAP_WIDTH } from './types'
-import { unitDef } from './units'
+import { isCavalry, isInfantry, unitDef } from './units'
 
 const NORTH = Math.PI / 2
 const SOUTH = -Math.PI / 2
@@ -34,7 +45,7 @@ const scratches = new WeakMap<Battle, Scratch>()
 function scratchOf(battle: Battle): Scratch {
   let found = scratches.get(battle)
   if (!found) {
-    found = { spatial: new Spatial(6, 2048), buf: [], live: [], indexOf: new Map() }
+    found = { spatial: new Spatial(2, 2048), buf: [], live: [], indexOf: new Map() }
     scratches.set(battle, found)
   }
   return found
@@ -63,17 +74,23 @@ export function createBattle(seed = 20261103): Battle {
     soldierById: new Map(),
     aiEnabled: false,
   }
-  spawn(battle, 0, 'infantry', '南军左步', 52, 58, NORTH)
-  spawn(battle, 0, 'infantry', '南军右步', 74, 58, NORTH)
-  spawn(battle, 0, 'archer', '南军弓箭', 63, 40, NORTH)
-  spawn(battle, 0, 'musket', '南军火枪', 24, 46, NORTH)
-  spawn(battle, 0, 'cavalry', '南军骑兵', 104, 60, NORTH)
-  spawn(battle, 0, 'chariot', '南军战车', 112, 40, NORTH)
-  spawn(battle, 1, 'infantry', '北军一步', 16, 128, SOUTH)
-  spawn(battle, 1, 'infantry', '北军二步', 40, 128, SOUTH)
-  spawn(battle, 1, 'infantry', '北军三步', 65, 128, SOUTH)
-  spawn(battle, 1, 'infantry', '北军四步', 90, 128, SOUTH)
-  spawn(battle, 1, 'infantry', '北军五步', 114, 128, SOUTH)
+  spawn(battle, 0, 'spear', '南军长矛', 118, 68, NORTH)
+  spawn(battle, 0, 'sword', '南军剑士', 150, 68, NORTH)
+  spawn(battle, 0, 'greatsword', '南军巨剑', 182, 68, NORTH)
+  spawn(battle, 0, 'archer', '南军弓箭', 148, 50, NORTH)
+  spawn(battle, 0, 'musket', '南军火枪', 92, 56, NORTH)
+  spawn(battle, 0, 'lightCavalry', '南军轻骑', 58, 70, NORTH)
+  spawn(battle, 0, 'heavyCavalry', '南军重骑', 242, 70, NORTH)
+  spawn(battle, 0, 'chariot', '南军战车', 210, 50, NORTH)
+  spawn(battle, 1, 'spear', '北军长矛', 54, 138, SOUTH)
+  spawn(battle, 1, 'sword', '北军剑士', 102, 138, SOUTH)
+  spawn(battle, 1, 'greatsword', '北军巨剑', 150, 138, SOUTH)
+  spawn(battle, 1, 'spear', '北军长矛二', 198, 138, SOUTH)
+  spawn(battle, 1, 'sword', '北军剑士二', 246, 138, SOUTH)
+  spawn(battle, 1, 'archer', '北军弓箭', 78, 166, SOUTH)
+  spawn(battle, 1, 'musket', '北军火枪', 126, 176, SOUTH)
+  spawn(battle, 1, 'heavyCavalry', '北军重骑', 174, 164, SOUTH)
+  spawn(battle, 1, 'chariot', '北军战车', 222, 172, SOUTH)
   return battle
 }
 
@@ -118,16 +135,17 @@ function spawn(
     exertion: 0,
     fatigue: 'fresh',
     restTime: 0,
-    chargeTimer: -1,
     wantCharge: false,
     anchorSpeed: 0,
     turnRate: 0,
     frameVx: 0,
     frameVy: 0,
     lag: 0,
+    trail: 0,
     bodySpeed: 0,
     stationaryTime: 0,
     braceSlow: 0,
+    plow: 0,
     bogTime: 0,
     bogged: false,
     routing: false,
@@ -143,6 +161,8 @@ function spawn(
     shot: false,
     engaged: false,
     nearEnemy: false,
+    meleeReact: false,
+    rearFoe: null,
   }
   for (let i = 0; i < def.models; i++) {
     const file = i % def.files
@@ -156,6 +176,7 @@ function spawn(
       vx: 0,
       vy: 0,
       speed: 0,
+      omega: 0,
       idle: true,
       facing,
       file,
@@ -165,6 +186,7 @@ function spawn(
       deathTime: -1,
       meleeCd: battle.rng() * def.meleeInterval,
       reload: def.missile ? battle.rng() * def.missile.reload : 0,
+      ammo: def.missile ? def.missile.ammo : 0,
       disengage: 0,
       leaving: false,
       fleeX: 0,
@@ -172,6 +194,9 @@ function spawn(
       latched: [],
       cleave: 0,
       flash: 0,
+      down: 0,
+      knockVx: 0,
+      knockVy: 0,
     }
     reg.soldiers.push(soldier)
     battle.soldierById.set(soldier.id, soldier)
@@ -191,6 +216,7 @@ export function step(battle: Battle, dt: number): void {
   applyAi(battle, dt)
   for (const reg of battle.regiments) {
     if (reg.order === 'attack') updateAttackDest(battle, reg)
+    faceMelee(reg)
     armCharge(reg)
   }
   moveRegiments(battle, dt)
@@ -211,7 +237,7 @@ export function step(battle: Battle, dt: number): void {
   separate(live, pad)
   absorbBumps(live)
   clampBodies(battle)
-  finishChargeFatigueBog(battle, dt)
+  finishChargeFatigueBog(battle, live, pad, dt)
   updateMorale(battle, dt)
   for (const reg of battle.regiments) compactRanks(reg)
   refreshCounts(battle)
@@ -270,9 +296,19 @@ function updateAttackDest(battle: Battle, reg: Regiment): void {
   const dx = target.anchorX - reg.anchorX
   const dy = target.anchorY - reg.anchorY
   const distance = Math.hypot(dx, dy) || 1
-  reg.destFacing = Math.atan2(dy, dx)
-  reg.facingLocked = true
   const def = unitDef(reg.type)
+  if (reg.plow > 0) {
+    const fwd = forward(reg.facing)
+    reg.destX = clamp(reg.anchorX + fwd.x * 14, 3, MAP_WIDTH - 3)
+    reg.destY = clamp(reg.anchorY + fwd.y * 14, 3, MAP_HEIGHT - 3)
+    reg.destFacing = reg.facing
+    reg.facingLocked = true
+    return
+  }
+  if (!def.missile) {
+    reg.destFacing = Math.atan2(dy, dx)
+    reg.facingLocked = true
+  }
   if (!def.missile && reg.engaged) {
     reg.destX = reg.anchorX
     reg.destY = reg.anchorY
@@ -280,8 +316,17 @@ function updateAttackDest(battle: Battle, reg: Regiment): void {
     return
   }
   if (def.missile) {
-    const desired = def.missile.range * 0.8
-    if (distance < 22) {
+    const toEnemy = Math.atan2(dy, dx)
+    const offCenter = Math.abs(angDiff(reg.facing, toEnemy))
+    const turningOnto = Math.abs(angDiff(reg.facing, reg.destFacing)) > 8 * DEG && Math.abs(angDiff(reg.destFacing, toEnemy)) < 15 * DEG
+    if (offCenter > fireHalf(def) || turningOnto) {
+      reg.destFacing = toEnemy
+      reg.facingLocked = true
+    } else {
+      reg.destFacing = reg.facing
+    }
+    const desired = Math.max(8, def.missile.range - firingDepth(reg, def))
+    if (distance < 22 && def.type !== 'musket') {
       reg.destX = clamp(target.anchorX - (dx / distance) * 30, 3, MAP_WIDTH - 3)
       reg.destY = clamp(target.anchorY - (dy / distance) * 30, 3, MAP_HEIGHT - 3)
     } else if (distance > desired) {
@@ -297,8 +342,21 @@ function updateAttackDest(battle: Battle, reg: Regiment): void {
   reg.destY = clamp(target.anchorY, 3, MAP_HEIGHT - 3)
 }
 
+/** Melee contact is remembered only while it lasts. It does not turn the whole block. */
+function faceMelee(reg: Regiment): void {
+  if (reg.routing || reg.aliveCount <= 0 || reg.plow > 0) return
+  if (!reg.engaged && !reg.inContact) {
+    reg.meleeReact = false
+    reg.rearFoe = null
+  }
+}
+
 function armCharge(reg: Regiment): void {
   const def = unitDef(reg.type)
+  if (reg.plow > 0) {
+    reg.wantCharge = true
+    return
+  }
   if (reg.order !== 'attack' || reg.routing || def.missile || def.chargeSpeed <= def.speed + 0.05) {
     if (reg.order !== 'attack' || reg.routing) reg.wantCharge = false
     return
@@ -307,7 +365,8 @@ function armCharge(reg: Regiment): void {
   const dy = reg.destY - reg.anchorY
   const distance = Math.hypot(dx, dy)
   const aligned = Math.abs(angDiff(reg.facing, reg.destFacing)) < 25 * DEG
-  if (distance > 18 && aligned) reg.wantCharge = true
+  const inStep = reg.lag < 0.8 && reg.anchorSpeed > def.speed * 0.8
+  if (distance > 18 && aligned && inStep) reg.wantCharge = true
 }
 
 function moveSpeedOf(reg: Regiment, soldier?: Soldier): number {
@@ -322,7 +381,7 @@ function moveSpeedOf(reg: Regiment, soldier?: Soldier): number {
 }
 
 function accelRate(def: UnitDef, speedingUp: boolean): number {
-  const base = def.type === 'chariot' ? 2.2 : def.type === 'cavalry' ? 2.8 : 1.7
+  const base = def.type === 'chariot' ? 2.2 : isCavalry(def.type) ? 2.8 : 1.7
   return speedingUp ? base : base * 1.7
 }
 
@@ -340,7 +399,7 @@ function halfWidth(reg: Regiment): number {
 
 function turnLever(def: UnitDef): number {
   if (def.shape === 'capsule') return Math.max(0.8, def.length * 0.5)
-  if (def.type === 'cavalry') return 0.9
+  if (isCavalry(def.type)) return 0.9
   return Math.max(0.45, def.spacing * 0.5)
 }
 
@@ -380,6 +439,7 @@ const REFORM_TURN = 45 * DEG
 function moveRegiments(battle: Battle, dt: number): void {
   for (const reg of battle.regiments) {
     if (reg.braceSlow > 0) reg.braceSlow = Math.max(0, reg.braceSlow - dt)
+    if (reg.plow > 0) reg.plow = Math.max(0, reg.plow - dt)
     const ox = reg.anchorX
     const oy = reg.anchorY
     const oFacing = reg.facing
@@ -405,9 +465,7 @@ function moveRegiments(battle: Battle, dt: number): void {
       reg.destY = reg.anchorY
       reg.destFacing = reg.facing
       reg.stationaryTime = 0
-    } else if (reg.engaged && !def.missile) {
-      const motion = drive(reg.facing, reg.destFacing, moveSpeedOf(reg), halfWidth(reg), dt, false)
-      reg.facing = motion.facing
+    } else if (reg.engaged && !def.missile && reg.plow <= 0) {
       reg.anchorSpeed = approach(reg.anchorSpeed, 0, accelRate(def, false) * 2.4, dt)
       reg.stationaryTime += dt
     } else {
@@ -439,22 +497,47 @@ function moveRegiments(battle: Battle, dt: number): void {
 }
 
 /**
- * March the block toward a heading. Small corrections wheel the block; the wheel never makes the inner
- * flank walk backward. A large turn re-forms the block on the spot instead of swinging it like a door.
- * The frame slows down while its soldiers are strung out behind it. Returns true when the block was re-laid.
+ * March the block toward a heading. The frame does not wait for the ranks to form before it sets off: it
+ * slows down while soldiers are strung out behind it, and goes a little easier while the block is still
+ * re-forming. Returns true when the block was re-laid.
+ *
+ * Foot walk straight at the destination and turn the block as they go, as fast as the outer flank can keep
+ * up by jogging; they may march obliquely to keep the facing they were given. Horses wheel the block, and the
+ * wheel never makes the inner flank walk backward. Past REFORM_TURN nobody wheels: the block re-forms facing
+ * the new way, and foot do it without stopping.
  */
 function march(reg: Regiment, def: UnitDef, heading: number, distance: number, dt: number, minCohesion: number): boolean {
-  const err = angDiff(reg.facing, heading)
-  if (Math.abs(err) > REFORM_TURN) {
-    reformAt(reg, reg.files, heading)
-    reg.anchorSpeed = 0
+  const footed = def.turnRadius === 0
+  const aim = reg.routing ? heading : travelFacing(def, reg.destFacing, heading)
+  const err = angDiff(reg.facing, aim)
+  const closing = reg.order === 'attack' && !def.missile && distance < releaseRange(def) * 2
+  if (!closing && Math.abs(err) > REFORM_TURN) {
+    if (footed) {
+      reformMoving(reg, reg.files, aim)
+    } else {
+      reformAt(reg, reg.files, heading)
+      reg.anchorSpeed = 0
+    }
     return true
   }
-  const cohesion = clamp(1 - (reg.lag - 0.8) / 1.6, minCohesion, 1)
-  const top = moveSpeedOf(reg) * cohesion
+  const wait = reg.plow > 0 ? 30 : reg.routing ? 6 : 4
+  const keepUp = closing ? 1 : reg.trail > wait ? 0 : clamp(1 - (reg.trail - 1.5) / 3, minCohesion, 1)
+  const settling = closing ? 1 : clamp(1.1 - reg.lag / 16, 0.75, 1)
+  const top = moveSpeedOf(reg) * keepUp * settling
   const lever = halfWidth(reg)
+  if (footed) {
+    const maxOmega = Math.min(def.turnCap, ((catchUpOf(reg, def) - 1) * moveSpeedOf(reg)) / lever)
+    const wantOmega = Math.abs(err) < 0.01 ? 0 : clamp(err * 2.5, -maxOmega, maxOmega)
+    reg.facing += approach(reg.turnRate, wantOmega, maxOmega * 2, dt) * dt
+    reg.anchorSpeed = approach(reg.anchorSpeed, top, accelRate(def, top > reg.anchorSpeed), dt)
+    const stepDist = Math.min(reg.anchorSpeed * dt, distance)
+    reg.anchorX = clamp(reg.anchorX + Math.cos(heading) * stepDist, 3, MAP_WIDTH - 3)
+    reg.anchorY = clamp(reg.anchorY + Math.sin(heading) * stepDist, 3, MAP_HEIGHT - 3)
+    return false
+  }
   const maxOmega = Math.min(top / (2 * lever), (reg.anchorSpeed + 0.3) / lever)
-  const omega = Math.abs(err) < 0.02 ? 0 : clamp(err * 2.5, -maxOmega, maxOmega)
+  const wantOmega = Math.abs(err) < 0.02 ? 0 : clamp(err * 2.5, -maxOmega, maxOmega)
+  const omega = clamp(approach(reg.turnRate, wantOmega, Math.max(0.05, maxOmega * 1.5), dt), -maxOmega, maxOmega)
   const target = Math.max(0, top - Math.abs(omega) * lever)
   reg.anchorSpeed = approach(reg.anchorSpeed, target, accelRate(def, target > reg.anchorSpeed), dt)
   reg.facing += omega * dt
@@ -470,6 +553,9 @@ function settleAtDest(reg: Regiment): boolean {
   const alive = Math.max(1, reg.aliveCount)
   const want = clamp(reg.destFiles, 1, alive)
   const have = clamp(reg.files, 1, alive)
+  const fitted = fitOnMap(reg, reg.destX, reg.destY, reg.destFacing, want)
+  reg.destX = fitted.x
+  reg.destY = fitted.y
   const offset = Math.hypot(reg.destX - reg.anchorX, reg.destY - reg.anchorY)
   const turn = Math.abs(angDiff(reg.facing, reg.destFacing))
   if (offset < 1e-3 && turn < 1e-3 && want === have) return false
@@ -532,9 +618,13 @@ function fillGrid(pad: Scratch, live: Live[]): Spatial {
 function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): void {
   const grid = fillGrid(pad, live)
   const buf = pad.buf
-  const lagSum = new Map<Regiment, { total: number; count: number }>()
+  const lagSum = new Map<Regiment, SlotTally>()
   const speedSum = new Map<Regiment, number>()
-  for (const reg of battle.regiments) reg.nearEnemy = false
+  const press: Press = { live, grid, buf, near: new Map(), claims: new Map() }
+  for (const reg of battle.regiments) {
+    reg.nearEnemy = false
+    lagSum.set(reg, { total: 0, trail: 0, count: 0 })
+  }
   for (let i = 0; i < live.length; i++) {
     const item = live[i]
     const { s, reg, def } = item
@@ -561,23 +651,22 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
     const lever = turnLever(def)
     const ox = s.x
     const oy = s.y
-    if (reg.engaged && !def.missile && !reg.routing) {
-      const face = foe && gapToFoe <= def.reach + 0.3 ? Math.atan2(foe.s.y - s.y, foe.s.x - s.x) : reg.facing
-      s.facing = drive(s.facing, face, gait, lever, dt, false).facing
-      s.speed = 0
-      s.idle = false
-    } else if (touching && foe && reg.order !== 'move') {
-      s.facing = drive(s.facing, Math.atan2(foe.s.y - s.y, foe.s.x - s.x), gait, lever, dt, false).facing
+    const fighting = reg.engaged && reg.plow <= 0 && !def.missile && !reg.routing && s.down <= 0
+    const frontRank = s.rank === 0 && s.centerIndex < 0
+    const runningIn = reg.order === 'attack' && !def.missile && !reg.engaged
+    const inFight = !!foe && reg.order !== 'move' && reg.plow <= 0 && !reg.routing && gapToFoe <= (runningIn ? 0.15 : def.reach)
+    if (s.down > 0) {
+      lieDown(s, dt)
+    } else if (fighting && foe && frontRank) {
+      closeIn(def, s, foe, gapToFoe, gait, lever, dt)
+    } else if (inFight && foe) {
+      rotate(def, s, angDiff(s.facing, Math.atan2(foe.s.y - s.y, foe.s.x - s.x)), gait, lever, dt)
       s.speed = 0
       s.idle = false
     } else {
-      const lag = followSlot(reg, def, s, gait, lever, dt)
-      const sum = lagSum.get(reg)
-      if (sum) {
-        sum.total += lag
-        sum.count += 1
-      } else {
-        lagSum.set(reg, { total: lag, count: 1 })
+      const attacking = reg.order === 'attack' && !def.missile && !reg.routing && reg.plow <= 0
+      if (!attacking || !chargeAt(battle, reg, def, s, gait, lever, dt, press)) {
+        followSlot(reg, def, s, gait, lever, dt, fighting, lagSum.get(reg)!)
       }
     }
     s.vx = (s.x - ox) / dt
@@ -586,22 +675,119 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
     speedSum.set(reg, moved + Math.hypot(s.vx, s.vy))
   }
   for (const reg of battle.regiments) {
-    const sum = lagSum.get(reg)
-    reg.lag = sum ? sum.total / sum.count : 0
+    const sum = lagSum.get(reg)!
+    reg.lag = sum.count > 0 ? sum.total / sum.count : 0
+    reg.trail = sum.count > 0 ? sum.trail / sum.count : 0
     reg.bodySpeed = reg.aliveCount > 0 ? (speedSum.get(reg) ?? 0) / reg.aliveCount : 0
   }
 }
 
 /**
+ * How close a man on an attack order gets to the target before he leaves his place and runs in. Chariots
+ * never leave the line: they ram as a block and drive on through, rather than each picking a man to run down.
+ */
+function releaseRange(def: UnitDef): number {
+  return def.type === 'chariot' ? 0 : Math.max(5, def.chargeSpeed * 1.3)
+}
+
+/** How many of the attacker's men are already about each enemy soldier this step, so the rest spread out. */
+interface Press {
+  live: Live[]
+  grid: Spatial
+  buf: number[]
+  near: Map<Soldier, number>
+  claims: Map<Soldier, number>
+}
+
+/** Men already this close round an enemy soldier count as crowding him. */
+const CROWD_RADIUS = 2.5
+/** Metres further a man will run to reach an enemy soldier with one fewer man on him. */
+const CROWD_COST = 3
+
+function crowdOn(press: Press, foe: Soldier, side: Regiment['side']): number {
+  const cached = press.near.get(foe)
+  if (cached !== undefined) return cached
+  press.grid.query(foe.x, foe.y, CROWD_RADIUS, press.buf)
+  let count = 0
+  for (const index of press.buf) {
+    const other = press.live[index]
+    if (other.reg.side !== side || !other.s.alive) continue
+    if ((other.s.x - foe.x) ** 2 + (other.s.y - foe.y) ** 2 <= CROWD_RADIUS ** 2) count += 1
+  }
+  press.near.set(foe, count)
+  return count
+}
+
+/**
+ * On an attack order the block keeps its ranks on the way in. A man who has come within release range of
+ * the target leaves his place and runs in. Once the block is locked in melee, every man with no one to fight
+ * goes for the target, so the wings wrap round its flanks. Each picks an enemy soldier near him who is not
+ * already mobbed. Returns false while he should keep his place.
+ */
+function chargeAt(
+  battle: Battle,
+  reg: Regiment,
+  def: UnitDef,
+  s: Soldier,
+  gait: number,
+  lever: number,
+  dt: number,
+  press: Press,
+): boolean {
+  if (def.type === 'chariot') return false
+  const target = reg.targetId !== null ? regimentById(battle, reg.targetId) : undefined
+  if (!target || target.aliveCount <= 0) return false
+  let nearest = Infinity
+  let bestCost = Infinity
+  let pick: Soldier | null = null
+  for (const foe of target.soldiers) {
+    if (!foe.alive) continue
+    const d = Math.hypot(foe.x - s.x, foe.y - s.y)
+    nearest = Math.min(nearest, d)
+    const self = d <= CROWD_RADIUS ? 1 : 0
+    const crowd = crowdOn(press, foe, reg.side) - self + (press.claims.get(foe) ?? 0)
+    const cost = d + CROWD_COST * Math.max(0, crowd)
+    if (cost < bestCost) {
+      bestCost = cost
+      pick = foe
+    }
+  }
+  if (!pick || (!reg.engaged && nearest > releaseRange(def))) return false
+  press.claims.set(pick, (press.claims.get(pick) ?? 0) + 1)
+  const distance = Math.hypot(pick.x - s.x, pick.y - s.y)
+  s.idle = false
+  steer(def, s, Math.atan2(pick.y - s.y, pick.x - s.x), gait, gait, lever, dt, distance, distance)
+  return true
+}
+
+/**
  * Walk toward a slot that may itself be moving. The soldier aims at where the slot is going, not just where
  * it is, so a man already in step simply keeps pace. Men who have fallen behind their mates jog to catch up.
- * A slot that is only a pace behind is waited for rather than turned around for. Returns the distance left.
+ * A slot that is only a pace behind is waited for rather than turned around for; in a melee a man never
+ * turns his back to walk to a slot behind him. On the march a man whose slot is behind him keeps moving
+ * forward, only slower, and lets the block come up to him, so a re-forming block flows into shape as it goes.
  */
-function followSlot(reg: Regiment, def: UnitDef, s: Soldier, gait: number, lever: number, dt: number): number {
+function followSlot(
+  reg: Regiment,
+  def: UnitDef,
+  s: Soldier,
+  gait: number,
+  lever: number,
+  dt: number,
+  holdGround: boolean,
+  tally: SlotTally,
+): void {
   const slot = slotOf(reg, def, s.file, s.rank, s.centerIndex)
   const ex = slot.x - s.x
   const ey = slot.y - s.y
   const distance = Math.hypot(ex, ey)
+  const frameSpeed = Math.hypot(reg.frameVx, reg.frameVy)
+  const marching = frameSpeed > 0.3 ? frameSpeed : 0
+  const fwd = marching > 0 ? { x: reg.frameVx / frameSpeed, y: reg.frameVy / frameSpeed } : forward(reg.facing)
+  const ahead = ex * fwd.x + ey * fwd.y
+  tally.total += distance
+  tally.trail += Math.max(0, ahead)
+  tally.count += 1
   const rx = slot.x - reg.anchorX
   const ry = slot.y - reg.anchorY
   const slotVx = reg.frameVx - reg.turnRate * ry
@@ -613,34 +799,98 @@ function followSlot(reg: Regiment, def: UnitDef, s: Soldier, gait: number, lever
   if (still && (distance < 0.2 || (s.idle && distance < 0.6))) {
     s.idle = true
     standBy(reg, def, s, gait, lever, dt, brake)
-    return distance
+    return
   }
   s.idle = false
 
-  const jog = reg.wantCharge || reg.braceSlow > 0 || reg.bogged ? 1 : Math.max(1.25, def.chargeSpeed / def.speed)
+  const jog = catchUpOf(reg, def)
   const straggling = clamp((distance - reg.lag + 0.15) / 1.2, 0, 1)
   const behind = still ? straggling : Math.max(straggling, clamp((distance - 0.3) / 1.5, 0, 1))
   const top = gait * (1 + (jog - 1) * behind)
   const pull = distance > 1e-6 ? Math.min(top, Math.sqrt(2 * brake * distance), distance * 4) / distance : 0
   let vx = slotVx + ex * pull
   let vy = slotVy + ey * pull
+  if (marching > 0 && !holdGround) {
+    const along = vx * fwd.x + vy * fwd.y
+    const across = Math.abs(vx * fwd.y - vy * fwd.x)
+    const least = Math.max(ahead < -0.5 ? marching * 0.7 : -Infinity, across * FALL_IN_SLOPE) - along
+    if (least > 0) {
+      vx += fwd.x * least
+      vy += fwd.y * least
+    }
+  }
   const want = Math.hypot(vx, vy)
   if (want > top) {
     vx *= top / want
     vy *= top / want
   }
   const heading = Math.atan2(vy, vx)
-  if (Math.abs(angDiff(s.facing, heading)) > 100 * DEG && distance < (still ? 0.3 : 0.9)) {
+  const behindMe = Math.abs(angDiff(s.facing, heading)) > 100 * DEG
+  if (behindMe && (distance < (still ? 0.3 : 0.9) || (holdGround && distance < 3))) {
     standBy(reg, def, s, gait, lever, dt, brake)
-    return distance
+    return
   }
-  steer(def, s, heading, Math.min(want, top), top, lever, dt, distance + slotSpeed * dt + 0.02)
-  return distance
+  steer(def, s, heading, Math.min(want, top), top, lever, dt, distance + slotSpeed * dt + 0.02, distance)
+}
+
+/** How much faster than the marching pace a man out of place may go to reach his slot. */
+function catchUpOf(reg: Regiment, def: UnitDef): number {
+  if (reg.braceSlow > 0 || reg.bogged) return 1
+  if (reg.wantCharge) return 1.15
+  return Math.max(1.5, def.chargeSpeed / def.speed)
+}
+
+/** On the march men close in on their slots at most 60° off the line of march: they ease over, never sidestep. */
+const FALL_IN_SLOPE = 1 / Math.tan(60 * DEG)
+
+interface SlotTally {
+  total: number
+  trail: number
+  count: number
+}
+
+function atSlot(reg: Regiment, def: UnitDef, s: Soldier): boolean {
+  const slot = slotOf(reg, def, s.file, s.rank, s.centerIndex)
+  return Math.hypot(slot.x - s.x, slot.y - s.y) < 0.35
+}
+
+/** Slide along the throw, then come to rest. Getting up is the icon fading back in. */
+function lieDown(s: Soldier, dt: number): void {
+  s.down = Math.max(0, s.down - dt)
+  s.speed = 0
+  s.omega = 0
+  s.idle = false
+  s.x += s.knockVx * dt
+  s.y += s.knockVy * dt
+  const drag = Math.exp(-1.8 * dt)
+  s.knockVx *= drag
+  s.knockVy *= drag
+  if (s.down === 0) {
+    s.knockVx = 0
+    s.knockVy = 0
+  }
+}
+
+/** Melee gap a man steps in to. Close enough to look like a fight, not so close that lines push each other. */
+const CLOSE_GAP = 0.2
+
+/** In a melee: step up to the nearest enemy within reach, then stand and face him. Never shoves past. */
+function closeIn(def: UnitDef, s: Soldier, foe: Live, gap: number, gait: number, lever: number, dt: number): void {
+  s.idle = false
+  const to = Math.atan2(foe.s.y - s.y, foe.s.x - s.x)
+  if (gap <= CLOSE_GAP) {
+    rotate(def, s, angDiff(s.facing, to), gait, lever, dt)
+    s.speed = 0
+    return
+  }
+  const room = gap - CLOSE_GAP
+  const want = Math.min(gait * 0.5, Math.sqrt(2 * accelRate(def, false) * room))
+  steer(def, s, to, want, gait, lever, dt, room, room)
 }
 
 /** Face the regiment's front and coast to a stop. */
 function standBy(reg: Regiment, def: UnitDef, s: Soldier, gait: number, lever: number, dt: number, brake: number): void {
-  s.facing = drive(s.facing, reg.facing, gait, lever, dt, false).facing
+  rotate(def, s, angDiff(s.facing, reg.facing), gait, lever, dt)
   s.speed = approach(s.speed, 0, brake, dt)
   if (s.speed <= 0) return
   const fwd = forward(s.facing)
@@ -649,17 +899,68 @@ function standBy(reg: Regiment, def: UnitDef, s: Soldier, gait: number, lever: n
 }
 
 /**
- * Turn toward a heading and walk forward only. Walking speed and the sweep of the turn share the top speed,
- * so a man at full stride has to slow down before he can turn hard.
+ * The fastest a body can turn right now. Walking speed and the sweep of the turn share the top speed.
+ * Horses and chariots also need to be rolling to turn well: standing, they only shuffle round slowly.
  */
-function steer(def: UnitDef, s: Soldier, heading: number, want: number, top: number, lever: number, dt: number, maxStep: number): void {
+function turnCapOf(def: UnitDef, speed: number, top: number, lever: number): number {
+  const budget = Math.max(0, top - speed) / Math.max(0.25, lever)
+  const rolling = def.turnRadius > 0 ? def.pivotRate + speed / def.turnRadius : def.turnCap
+  return Math.min(def.turnCap, budget, rolling)
+}
+
+/**
+ * Turn by `err` with angular inertia: the turn builds up, then eases off so it stops on target.
+ * Returns the turn speed this body wanted, before inertia held it back.
+ */
+function rotate(def: UnitDef, s: Soldier, err: number, top: number, lever: number, dt: number): number {
+  const cap = turnCapOf(def, s.speed, top, lever)
+  const easing = Math.sqrt(2 * def.turnAccel * Math.abs(err))
+  const want = Math.abs(err) < 0.01 ? 0 : Math.sign(err) * Math.min(cap, easing)
+  s.omega = approach(s.omega, want, def.turnAccel, dt)
+  s.facing += s.omega * dt
+  return want
+}
+
+/**
+ * Fastest forward speed at which the arc onto a point `distance` away and `err` off the nose can still be
+ * turned. Without this a horse or chariot circles a nearby spot forever instead of slowing down to turn in.
+ */
+function arcSpeed(def: UnitDef, err: number, distance: number): number {
+  const curvature = (2 * Math.sin(Math.min(Math.abs(err), Math.PI / 2))) / Math.max(0.05, distance)
+  if (curvature < 1e-4) return Infinity
+  let limit = (def.turnCap * 0.8) / curvature
+  if (def.turnRadius > 0) {
+    const excess = curvature - 1 / def.turnRadius
+    if (excess > 0) limit = Math.min(limit, (def.pivotRate * 0.8) / excess)
+  }
+  return limit
+}
+
+/**
+ * Turn toward a heading and walk forward only. A man at full stride has to slow down before he can turn hard.
+ * Mounted bodies far from where they are going keep rolling through a wide turn instead of stopping to pivot.
+ */
+function steer(
+  def: UnitDef,
+  s: Soldier,
+  heading: number,
+  want: number,
+  top: number,
+  lever: number,
+  dt: number,
+  maxStep: number,
+  distance: number,
+): void {
   const safeLever = Math.max(0.25, lever)
   const err = angDiff(s.facing, heading)
-  const wantOmega = Math.abs(err) < 0.02 ? 0 : err * 6
-  const target = Math.abs(err) >= Math.PI / 2 ? 0 : Math.max(0, Math.min(want, top - Math.abs(wantOmega) * safeLever)) * Math.cos(err)
+  const wantOmega = rotate(def, s, err, top, lever, dt)
+  let target = Math.abs(err) >= Math.PI / 2 ? 0 : Math.max(0, Math.min(want, top - Math.abs(wantOmega) * safeLever)) * Math.cos(err)
+  if (def.turnRadius > 0 && Math.abs(err) > 30 * DEG && distance > def.turnRadius * 1.5) {
+    const cruise = ((top * def.turnRadius) / (def.turnRadius + safeLever)) * 0.75
+    target = Math.max(target, Math.min(cruise, want))
+  }
+  target = Math.min(target, arcSpeed(def, err, distance))
   s.speed = approach(s.speed, target, accelRate(def, target > s.speed), dt)
-  const room = Math.max(0, top - s.speed) / safeLever
-  s.facing += clamp(wantOmega, -room, room) * dt
   if (s.speed <= 0) return
   const fwd = forward(s.facing)
   const stepDist = Math.min(s.speed * dt, maxStep)
@@ -694,14 +995,14 @@ function resolveMelee(battle: Battle, live: Live[], grid: Spatial, buf: number[]
   const ready: { attacker: Live; target: Live; gap: number }[] = []
   for (let i = 0; i < live.length; i++) {
     const item = live[i]
-    if (!item.s.alive || item.reg.routing) continue
+    if (!item.s.alive || item.reg.routing || item.s.down > 0) continue
     item.s.meleeCd -= dt
     grid.query(item.s.x, item.s.y, item.def.reach + 3, buf)
     let target: Live | null = null
     let targetGap = Infinity
     for (const otherIndex of buf) {
       const other = live[otherIndex]
-      if (other.reg.side === item.reg.side || !other.s.alive) continue
+      if (other.reg.side === item.reg.side || !other.s.alive || other.s.down > 0) continue
       const gap = gapBetween(item.s, item.def, other.s, other.def)
       if (gap > item.def.reach) continue
       item.reg.inContact = true
@@ -735,10 +1036,14 @@ function resolveMelee(battle: Battle, live: Live[], grid: Spatial, buf: number[]
 function landMelee(battle: Battle, item: Live, target: Live): void {
   item.s.meleeCd = item.def.meleeInterval
   const mods = fatigueMods(item.reg.fatigue)
-  const scale = chargeScale(item.reg.chargeTimer)
-  const charge = item.def.chargeBonus * mods.stat * scale
+  const dx = target.s.x - item.s.x
+  const dy = target.s.y - item.s.y
+  const apart = Math.hypot(dx, dy) || 1
+  const closing = ((item.s.vx - target.s.vx) * dx + (item.s.vy - target.s.vy) * dy) / apart
+  const charge = item.def.chargeBonus * mods.stat * chargeShare(closing, item.def.chargeSpeed * mods.stat)
   let attack = item.def.meleeAttack * mods.stat + charge
   if (target.def.large) attack += item.def.antiLargeMa
+  else if (isInfantry(target.def.type)) attack += item.def.antiInfantryMa
   let defense = target.def.meleeDefense * fatigueMods(target.reg.fatigue).stat
   const arc = facingArc(target.reg.facing, target.s.x, target.s.y, item.s.x, item.s.y)
   if (arc === 'flank') defense *= 0.45
@@ -747,8 +1052,11 @@ function landMelee(battle: Battle, item: Live, target: Live): void {
   if (target.reg.bogged) defense -= 8
   defense = Math.max(0, defense)
   if (battle.rng() * 100 > hitChance(attack, defense)) return
+  target.reg.meleeReact = true
+  if (arc === 'rear') target.reg.rearFoe = item.reg.id
   const fromCharge = splitBonus(item.def.weaponBase, item.def.weaponAp, charge)
-  const fromAnti = splitBonus(item.def.weaponBase, item.def.weaponAp, target.def.large ? item.def.antiLargeWs : 0)
+  const antiWs = target.def.large ? item.def.antiLargeWs : isInfantry(target.def.type) ? item.def.antiInfantryWs : 0
+  const fromAnti = splitBonus(item.def.weaponBase, item.def.weaponAp, antiWs)
   hurt(
     battle,
     target,
@@ -766,10 +1074,10 @@ function resolveShooting(battle: Battle, live: Live[], grid: Spatial, pad: Scrat
     if (!def.missile || reg.routing || reg.aliveCount <= 0) continue
     const target = shootingTarget(battle, reg, def.missile.range)
     if (!target) continue
-    reg.shot = true
     const reload = def.missile.reload * fatigueMods(reg.fatigue).reload
+    let fired = false
     for (const soldier of reg.soldiers) {
-      if (!soldier.alive) continue
+      if (!soldier.alive || soldier.down > 0) continue
       const selfIndex = pad.indexOf.get(soldier.id) ?? -1
       const foe = selfIndex >= 0 ? nearestEnemy(live, grid, buf, selfIndex, def.reach) : null
       if (foe && gapBetween(soldier, def, foe.s, foe.def) <= def.reach) continue
@@ -778,25 +1086,48 @@ function resolveShooting(battle: Battle, live: Live[], grid: Spatial, pad: Scrat
         continue
       }
       const prey = randomAlive(battle, target)
-      if (!prey) continue
+      if (!prey || soldier.ammo <= 0 || !inFireArc(reg, prey.x, prey.y)) continue
+      if (Math.hypot(prey.x - soldier.x, prey.y - soldier.y) > def.missile.range) continue
       spawnArrow(battle, reg, soldier, prey, def)
+      soldier.ammo -= 1
       soldier.reload = reload
+      fired = true
     }
+    if (fired) reg.shot = true
   }
 }
 
+/** How far the rear rank stands behind the front anchor. The standoff leaves this much inside the weapon range. */
+function firingDepth(reg: Regiment, def: UnitDef): number {
+  const files = Math.max(1, reg.files)
+  const ranks = Math.max(1, Math.ceil(reg.aliveCount / files))
+  return (ranks - 1) * def.rankSpacing + 0.8
+}
+
+function fireHalf(def: UnitDef): number {
+  return ((def.missile?.cone ?? 120) / 2) * DEG
+}
+
+function inFireArc(reg: Regiment, x: number, y: number): boolean {
+  const to = Math.atan2(y - reg.anchorY, x - reg.anchorX)
+  return Math.abs(angDiff(reg.facing, to)) <= fireHalf(unitDef(reg.type))
+}
+
 function shootingTarget(battle: Battle, reg: Regiment, range: number): Regiment | null {
+  const canShoot = (target: Regiment) => {
+    const distance = Math.hypot(target.anchorX - reg.anchorX, target.anchorY - reg.anchorY)
+    return distance <= range && inFireArc(reg, target.anchorX, target.anchorY)
+  }
   if (reg.order === 'attack' && reg.targetId !== null) {
     const target = regimentById(battle, reg.targetId)
     if (!target || target.aliveCount <= 0) return null
-    const distance = Math.hypot(target.anchorX - reg.anchorX, target.anchorY - reg.anchorY)
-    return distance <= range ? target : null
+    return canShoot(target) ? target : null
   }
   if (reg.order !== 'hold') return null
   let best: Regiment | null = null
   let bestD = range
   for (const other of battle.regiments) {
-    if (other.side === reg.side || other.aliveCount <= 0) continue
+    if (other.side === reg.side || other.aliveCount <= 0 || !canShoot(other)) continue
     const distance = Math.hypot(other.anchorX - reg.anchorX, other.anchorY - reg.anchorY)
     if (distance <= bestD) {
       best = other
@@ -947,6 +1278,15 @@ function flyArc(battle: Battle, projectile: Projectile, live: Live[], dt: number
   hurt(battle, best, source, projectile.base, projectile.ap, false)
 }
 
+/** A braced front stops the charge flat. The men stay on their feet. */
+function pinBrace(item: Live): void {
+  item.reg.plow = 0
+  const current = Math.hypot(item.s.vx, item.s.vy) || 1
+  item.s.vx = (item.s.vx / current) * 2
+  item.s.vy = (item.s.vy / current) * 2
+  item.reg.braceSlow = Math.max(item.reg.braceSlow, 1.6)
+}
+
 function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[]): void {
   for (let i = 0; i < live.length; i++) {
     const item = live[i]
@@ -961,7 +1301,6 @@ function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[
       const other = battle.soldierById.get(id)
       return !!other && other.alive && Math.hypot(other.x - item.s.x, other.y - item.s.y) < 2
     })
-    if (item.s.cleave >= item.def.cleave) continue
     grid.query(item.s.x, item.s.y, item.def.reach + 3, buf)
     const hits: { item: Live; gap: number }[] = []
     for (const otherIndex of buf) {
@@ -973,8 +1312,9 @@ function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[
       hits.push({ item: other, gap })
     }
     hits.sort((a, b) => a.gap - b.gap)
+    const chargeVx = item.s.vx
+    const chargeVy = item.s.vy
     for (const hit of hits) {
-      if (item.s.cleave >= item.def.cleave) break
       const dx = hit.item.s.x - item.s.x
       const dy = hit.item.s.y - item.s.y
       const distance = Math.hypot(dx, dy) || 1
@@ -983,24 +1323,30 @@ function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[
       const closing = (item.s.vx - hit.item.s.vx) * nx + (item.s.vy - hit.item.s.vy) * ny
       if (closing <= 5) continue
       const braced = isBracing(hit.item.reg, hit.item.def, item.s.x, item.s.y)
-      const raw = impactRaw(item.def.impactPower, closing, item.def.mass, hit.item.def.mass, braced)
-      hurt(battle, hit.item, item.reg, raw * 0.3, raw * 0.7, true)
+      const arc = facingArc(hit.item.reg.facing, hit.item.s.x, hit.item.s.y, item.s.x, item.s.y)
+      const foot = !hit.item.def.large
+      const sprawl = foot && (!braced || arc === 'rear')
+      if (braced) pinBrace(item)
+      else if (item.def.type === 'chariot' && foot) item.reg.plow = Math.max(item.reg.plow, PLOW_TIME)
+      if (hit.item.s.down > 0) continue
+      const room = item.s.cleave < item.def.cleave
+      if (room) {
+        const raw = impactRaw(item.def.impactPower, closing, item.def.mass, hit.item.def.mass, braced)
+        hurt(battle, hit.item, item.reg, raw * 0.3, raw * 0.7, true)
+        item.s.latched.push(hit.item.s.id)
+        item.s.cleave += 1
+      }
+      if (sprawl) knockDown(hit.item.s, nx, ny, closing, item.def.mass, chargeVx, chargeVy)
+      if (!room && !sprawl) continue
       item.reg.inContact = true
       hit.item.reg.inContact = true
-      const arc = facingArc(hit.item.reg.facing, hit.item.s.x, hit.item.s.y, item.s.x, item.s.y)
       if (arc === 'rear') hit.item.reg.touchRear = true
       else if (arc === 'flank') hit.item.reg.touchFlank = true
-      item.s.latched.push(hit.item.s.id)
-      item.s.cleave += 1
-      const slow = closing * (hit.item.def.mass / (item.def.mass + hit.item.def.mass)) * 0.85
+      if (braced) continue
+      const defendMass = hit.item.s.down > 0 ? hit.item.def.mass * 0.3 : hit.item.def.mass
+      const slow = closing * (defendMass / (item.def.mass + defendMass)) * 0.35
       item.s.vx -= nx * slow
       item.s.vy -= ny * slow
-      if (braced) {
-        const current = Math.hypot(item.s.vx, item.s.vy) || 1
-        item.s.vx = (item.s.vx / current) * 2
-        item.s.vy = (item.s.vy / current) * 2
-        item.reg.braceSlow = Math.max(item.reg.braceSlow, 1.6)
-      }
     }
   }
 }
@@ -1030,23 +1376,34 @@ function separate(live: Live[], pad: Scratch): void {
         }
         const nx = dx / distance
         const ny = dy / distance
-        let massA = a.def.mass
-        let massB = b.def.mass
-        if (isBracing(a.reg, a.def, b.s.x, b.s.y)) massA *= 6
-        if (isBracing(b.reg, b.def, a.s.x, a.s.y)) massB *= 6
+        let massA = collisionMass(a, b.s.x, b.s.y)
+        let massB = collisionMass(b, a.s.x, a.s.y)
         const total = massA + massB
         const push = 0.05 - gap
-        a.s.x -= nx * push * (massB / total)
-        a.s.y -= ny * push * (massB / total)
-        b.s.x += nx * push * (massA / total)
-        b.s.y += ny * push * (massA / total)
+        const enemy = a.reg.side !== b.reg.side
+        const plowA = enemy && a.def.type === 'chariot' && a.reg.plow > 0
+        const plowB = enemy && b.def.type === 'chariot' && b.reg.plow > 0
+        if (plowA && !plowB) {
+          b.s.x += nx * push
+          b.s.y += ny * push
+        } else if (plowB && !plowA) {
+          a.s.x -= nx * push
+          a.s.y -= ny * push
+        } else {
+          a.s.x -= nx * push * (massB / total)
+          a.s.y -= ny * push * (massB / total)
+          b.s.x += nx * push * (massA / total)
+          b.s.y += ny * push * (massA / total)
+        }
         const relVn = (b.s.vx - a.s.vx) * nx + (b.s.vy - a.s.vy) * ny
-        if (relVn < 0) {
+        if (relVn < 0 && enemy) {
           const impulse = -relVn / (1 / massA + 1 / massB)
-          a.s.vx -= nx * impulse / massA
-          a.s.vy -= ny * impulse / massA
-          b.s.vx += nx * impulse / massB
-          b.s.vy += ny * impulse / massB
+          const keepA = plowA ? 0.05 : 1
+          const keepB = plowB ? 0.05 : 1
+          a.s.vx -= (nx * impulse * keepA) / massA
+          a.s.vy -= (ny * impulse * keepA) / massA
+          b.s.vx += (nx * impulse * keepB) / massB
+          b.s.vy += (ny * impulse * keepB) / massB
         }
       }
     }
@@ -1096,45 +1453,32 @@ function clampBodies(battle: Battle): void {
   }
 }
 
-function linePressed(battle: Battle, reg: Regiment, def: UnitDef): boolean {
+function linePressed(reg: Regiment, def: UnitDef, live: Live[], pad: Scratch): boolean {
   const front = reg.soldiers.filter((soldier) => soldier.alive && soldier.rank === 0 && soldier.centerIndex < 0)
   if (front.length === 0) return false
   const pressedGap = reg.engaged ? def.reach : 0.35
   let pressed = 0
   for (const soldier of front) {
-    let best = Infinity
-    for (const other of battle.regiments) {
-      if (other.side === reg.side || other.aliveCount <= 0) continue
-      const otherDef = unitDef(other.type)
-      for (const enemy of other.soldiers) {
-        if (!enemy.alive) continue
-        const gap = Math.hypot(enemy.x - soldier.x, enemy.y - soldier.y) - def.radius - otherDef.radius
-        if (gap < best) best = gap
-      }
-    }
-    if (best <= pressedGap) pressed += 1
+    const index = pad.indexOf.get(soldier.id)
+    if (index === undefined) continue
+    if (nearestEnemy(live, pad.spatial, pad.buf, index, pressedGap + 1e-6)) pressed += 1
   }
   const needed = reg.engaged ? Math.max(1, Math.ceil(front.length * 0.2)) : Math.max(1, Math.ceil(front.length * 0.45))
   return pressed >= needed
 }
 
-function finishChargeFatigueBog(battle: Battle, dt: number): void {
+function finishChargeFatigueBog(battle: Battle, live: Live[], pad: Scratch, dt: number): void {
+  fillGrid(pad, live)
   for (const reg of battle.regiments) {
     const def = unitDef(reg.type)
-    const trigger = Math.max(5, def.chargeSpeed * 0.75)
     const charging = reg.wantCharge
-    if (reg.inContact && reg.anchorSpeed >= trigger && reg.chargeTimer < 0) reg.chargeTimer = 0
-    else if (reg.chargeTimer >= 0) {
-      reg.chargeTimer += dt
-      if (reg.chargeTimer >= 12) reg.chargeTimer = reg.inContact ? 12 : -1
-    }
-    if (reg.inContact) reg.wantCharge = false
+    if (reg.inContact && reg.plow <= 0) reg.wantCharge = false
     if (def.missile || reg.order === 'move' || reg.routing) reg.engaged = false
-    else if (reg.order === 'attack' || reg.order === 'hold') reg.engaged = linePressed(battle, reg, def)
+    else if (reg.order === 'attack' || reg.order === 'hold') reg.engaged = linePressed(reg, def, live, pad)
 
     if (def.type === 'chariot') {
       const slow = reg.anchorSpeed < 3.5 || reg.braceSlow > 0 || reg.bogged
-      if (reg.inContact && slow) reg.bogTime += dt
+      if (reg.inContact && slow && reg.plow <= 0) reg.bogTime += dt
       else if (!reg.inContact) reg.bogTime = Math.max(0, reg.bogTime - dt)
       if (reg.bogTime >= 2) reg.bogged = true
       if (reg.bogged && !reg.inContact && reg.anchorSpeed > 8) {
@@ -1195,6 +1539,10 @@ function updateMorale(battle: Battle, dt: number): void {
       reg.order = 'hold'
       reg.targetId = null
       reg.wantCharge = false
+      reg.engaged = false
+      reg.destX = reg.anchorX
+      reg.destY = reg.anchorY
+      reg.facingLocked = true
       continue
     }
     if (!reg.routing) continue
@@ -1226,7 +1574,44 @@ function checkVictory(battle: Battle): void {
   pushNotice(battle, text)
 }
 
+function collisionMass(item: Live, otherX: number, otherY: number): number {
+  if (item.s.down > 0) return item.def.mass * 0.3
+  if (isBracing(item.reg, item.def, otherX, otherY)) return item.def.mass * 6
+  return item.def.mass
+}
+
+/** How long a chariot keeps its charge after it last ran over men who were not braced. */
+const PLOW_TIME = 1.8
+
+/** Toss a foot soldier along the charge. Heavier mounts throw him farther. Immune until he gets up. */
+function knockDown(
+  soldier: Soldier,
+  nx: number,
+  ny: number,
+  closing: number,
+  attackerMass: number,
+  vx: number,
+  vy: number,
+): void {
+  const heft = Math.min(2.1, Math.sqrt(attackerMass / 480))
+  const launch = Math.min(32, Math.max(18, closing * 1.55 * heft))
+  const speed = Math.hypot(vx, vy)
+  let fx = nx
+  let fy = ny
+  if (speed > 1) {
+    fx = (vx / speed) * 0.8 + nx * 0.2
+    fy = (vy / speed) * 0.8 + ny * 0.2
+  }
+  const flen = Math.hypot(fx, fy) || 1
+  soldier.down = KNOCK_TIME
+  soldier.knockVx = (fx / flen) * launch
+  soldier.knockVy = (fy / flen) * launch
+  soldier.speed = 0
+  soldier.idle = false
+}
+
 function hurt(battle: Battle, target: Live, source: Regiment | null, base: number, ap: number, impact: boolean): void {
+  if (target.s.down > 0) return
   const damage = mitigate(base, ap, target.def.armor, armorRoll(battle.rng))
   if (damage <= 0 || !target.s.alive) return
   target.s.hp -= damage

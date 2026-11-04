@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createBattle, step } from '../src/sim/battle'
 import {
-  chargeScale,
+  chargeShare,
   effectiveLeadership,
   hitChance,
   impactRaw,
@@ -9,7 +9,7 @@ import {
 } from '../src/sim/combat'
 import { assignFormation, isBracing, slotOf } from '../src/sim/formation'
 import { facingArc } from '../src/sim/math'
-import { clampFrontLine, commandMove } from '../src/sim/orders'
+import { clampFrontLine, commandAttack, commandMove } from '../src/sim/orders'
 import { UNITS } from '../src/sim/units'
 
 describe('combat formulas', () => {
@@ -32,11 +32,12 @@ describe('combat formulas', () => {
     expect(impactRaw(70, 13, 110, 480, false)).toBeLessThan(impactRaw(70, 13, 480, 110, false))
   })
 
-  it('decays charge bonus after four seconds', () => {
-    expect(chargeScale(-1)).toBe(0)
-    expect(chargeScale(2)).toBe(1)
-    expect(chargeScale(8)).toBeCloseTo(0.5)
-    expect(chargeScale(12)).toBe(0)
+  it('scales charge bonus by closing speed against top speed', () => {
+    expect(chargeShare(0, 9.4)).toBe(0)
+    expect(chargeShare(-3, 9.4)).toBe(0)
+    expect(chargeShare(4.7, 9.4)).toBeCloseTo(0.5)
+    expect(chargeShare(9.4, 9.4)).toBe(1)
+    expect(chargeShare(15, 9.4)).toBe(1)
   })
 
   it('keeps leadership above zero until losses and position stack', () => {
@@ -80,12 +81,20 @@ describe('formation line', () => {
     expect(wide.length).toBeCloseTo(4)
     expect(wide.x2).toBeCloseTo(4)
     const reversed = clampFrontLine(100, 2, 0, 2, 1, 5)
-    expect(reversed.x1).toBe(0)
+    expect(reversed.x1).toBe(100)
     expect(reversed.y1).toBe(2)
-    expect(reversed.x2).toBeCloseTo(4)
+    expect(reversed.x2).toBeCloseTo(96)
     const fitted = clampFrontLine(3, 1, 5, 1, 0.85, 80)
     expect(fitted.x1).toBe(3)
     expect(fitted.length).toBeCloseTo(2)
+  })
+
+  it('never stands a unit wider than its type allows', () => {
+    const battle = createBattle(1)
+    for (const reg of battle.regiments) {
+      assignFormation(reg, reg.aliveCount)
+      expect(reg.files).toBe(Math.min(reg.aliveCount, UNITS[reg.type].maxFiles))
+    }
   })
 })
 
@@ -97,8 +106,8 @@ describe('rear rank', () => {
     const rear = reg.soldiers.filter((soldier) => soldier.alive && soldier.centerIndex >= 0)
     expect(rear).toHaveLength(80 % 6)
     const rank = rear[0].rank
-    const left = slotOf(reg, UNITS.infantry, 0, rank, 0)
-    const right = slotOf(reg, UNITS.infantry, 0, rank, rear.length - 1)
+    const left = slotOf(reg, UNITS[reg.type], 0, rank, 0)
+    const right = slotOf(reg, UNITS[reg.type], 0, rank, rear.length - 1)
     expect((left.x + right.x) / 2).toBeCloseTo(reg.anchorX, 4)
     expect(left.y).toBeCloseTo(right.y, 4)
   })
@@ -107,18 +116,18 @@ describe('rear rank', () => {
 describe('battle', () => {
   it('opens with both armies already formed', () => {
     const battle = createBattle(1)
-    expect(battle.regiments).toHaveLength(11)
+    expect(battle.regiments).toHaveLength(17)
     const men = battle.regiments.reduce((sum, reg) => sum + reg.initial, 0)
-    expect(men).toBe(700)
-    expect(battle.regiments.filter((reg) => reg.side === 1 && reg.type === 'infantry')).toHaveLength(5)
+    expect(men).toBe(956)
+    expect(battle.regiments.filter((reg) => reg.side === 1 && (reg.type === 'spear' || reg.type === 'sword' || reg.type === 'greatsword'))).toHaveLength(5)
     expect(battle.aiEnabled).toBe(false)
     expect(battle.regiments.filter((reg) => reg.type === 'chariot')[0].initial).toBe(4)
     expect(battle.regiments.every((reg) => reg.order === 'hold')).toBe(true)
     const infantry = battle.regiments[0]
-    expect(isBracing(infantry, UNITS.infantry, infantry.anchorX, infantry.anchorY + 20)).toBe(false)
+    expect(isBracing(infantry, UNITS[infantry.type], infantry.anchorX, infantry.anchorY + 20)).toBe(false)
     infantry.stationaryTime = 1.5
-    expect(isBracing(infantry, UNITS.infantry, infantry.anchorX, infantry.anchorY + 20)).toBe(true)
-    expect(isBracing(infantry, UNITS.infantry, infantry.anchorX, infantry.anchorY - 20)).toBe(false)
+    expect(isBracing(infantry, UNITS[infantry.type], infantry.anchorX, infantry.anchorY + 20)).toBe(true)
+    expect(isBracing(infantry, UNITS[infantry.type], infantry.anchorX, infantry.anchorY - 20)).toBe(false)
   })
 
   it('accepts a move order and stays finite while the enemy closes', () => {
@@ -138,12 +147,98 @@ describe('battle', () => {
         expect(Number.isFinite(soldier.hp)).toBe(true)
       }
     }
-    const enemy = battle.regiments.find((reg) => reg.name === '北军一步')
+    const enemy = battle.regiments.find((reg) => reg.name === '北军长矛')
     expect(enemy).toBeTruthy()
-    expect(enemy!.anchorY).toBeCloseTo(128, 0)
+    expect(enemy!.anchorY).toBeCloseTo(138, 0)
     expect(totalHp(battle)).toBe(startHp)
   })
+
+  it('lets a chariot rear charge collision throw infantry and drive through without killing them', () => {
+    const bonus = UNITS.chariot.chargeBonus
+    UNITS.chariot.chargeBonus = 0
+    try {
+      const run = chariotRearCharge()
+      expect(run.flung).toBeGreaterThan(8)
+      expect(run.infantry.aliveCount).toBe(80)
+      expect(run.worstOnHit).toBeGreaterThan(12)
+      expect(run.chariot.anchorY).toBeGreaterThan(run.infantry.anchorY + 4)
+    } finally {
+      UNITS.chariot.chargeBonus = bonus
+    }
+  })
+
+  it('adds charge bonus to blows struck while closing at speed', () => {
+    const bonus = UNITS.chariot.chargeBonus
+    UNITS.chariot.chargeBonus = 0
+    let plain: number
+    try {
+      plain = totalHp(chariotRearCharge().battle)
+    } finally {
+      UNITS.chariot.chargeBonus = bonus
+    }
+    const charged = chariotRearCharge()
+    expect(totalHp(charged.battle)).toBeLessThan(plain)
+    expect(charged.flung).toBeGreaterThan(8)
+  })
 })
+
+function chariotRearCharge() {
+  const battle = createBattle(3)
+  const chariot = battle.regiments.find((reg) => reg.name === '南军战车')!
+  const infantry = battle.regiments.find((reg) => reg.name === '北军长矛二')!
+  const north = Math.PI / 2
+  let park = 0
+  for (const reg of battle.regiments) {
+    if (reg === chariot || reg === infantry) continue
+    dropRegiment(reg, 18 + (park % 4) * 28, 16 + Math.floor(park / 4) * 22, north)
+    park += 1
+  }
+  dropRegiment(infantry, 200, 120, north)
+  dropRegiment(chariot, 200, 72, north)
+  commandAttack(battle, [chariot.id], infantry.id)
+  let flung = 0
+  let worstOnHit = 64
+  const seenDown = new Set<number>()
+  for (let i = 0; i < 20 * 12; i++) {
+    step(battle, 0.05)
+    for (const soldier of infantry.soldiers) {
+      if (soldier.down > 0 && !seenDown.has(soldier.id)) {
+        seenDown.add(soldier.id)
+        flung += 1
+        if (soldier.alive) worstOnHit = Math.min(worstOnHit, soldier.hp)
+      }
+    }
+  }
+  return { battle, chariot, infantry, flung, worstOnHit }
+}
+
+function dropRegiment(reg: ReturnType<typeof createBattle>['regiments'][number], x: number, y: number, facing: number): void {
+  reg.anchorX = x
+  reg.anchorY = y
+  reg.destX = x
+  reg.destY = y
+  reg.facing = facing
+  reg.destFacing = facing
+  reg.order = 'hold'
+  reg.targetId = null
+  reg.wantCharge = false
+  reg.engaged = false
+  reg.plow = 0
+  reg.anchorSpeed = 0
+  const def = UNITS[reg.type]
+  for (const soldier of reg.soldiers) {
+    const slot = slotOf(reg, def, soldier.file, soldier.rank, soldier.centerIndex)
+    soldier.x = slot.x
+    soldier.y = slot.y
+    soldier.facing = facing
+    soldier.speed = 0
+    soldier.vx = 0
+    soldier.vy = 0
+    soldier.down = 0
+    soldier.knockVx = 0
+    soldier.knockVy = 0
+  }
+}
 
 function totalHp(battle: ReturnType<typeof createBattle>): number {
   let hp = 0

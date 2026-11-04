@@ -131,12 +131,12 @@ function frame(now: number): void {
   if (!paused && battle.winner === null) {
     accumulator += dt * speed
     let steps = 0
-    while (accumulator >= SIM_DT && steps < 8) {
+    while (accumulator >= SIM_DT && steps < 12) {
       step(battle, SIM_DT)
       accumulator -= SIM_DT
       steps += 1
     }
-    if (steps === 8) accumulator = 0
+    if (steps === 12) accumulator = 0
   }
   render(canvas!, {
     battle,
@@ -263,7 +263,15 @@ function paintDetail(subject: Regiment | null): void {
   bars.append(bar('领导力', Math.max(0, subject.leadership / def.leadership), '#e0c27a'))
   const stats = document.createElement('p')
   stats.className = 'muted'
-  stats.textContent = `攻击 ${def.meleeAttack} · 防御 ${def.meleeDefense} · 护甲 ${def.armor} · 武器 ${def.weaponBase}+${def.weaponAp}`
+  const trait =
+    def.antiLargeMa > 0
+      ? ` · 反大型 +${def.antiLargeMa}/+${def.antiLargeWs}`
+      : def.antiInfantryMa > 0
+        ? ` · 反步 +${def.antiInfantryMa}/+${def.antiInfantryWs}`
+        : def.shieldBlock > 0
+          ? ` · 盾牌 ${Math.round(def.shieldBlock * 100)}%`
+          : ''
+  stats.textContent = `攻击 ${def.meleeAttack} · 防御 ${def.meleeDefense} · 护甲 ${def.armor} · 武器 ${def.weaponBase}+${def.weaponAp}${trait}`
   root.append(title, meta, count, bars, stats)
 }
 

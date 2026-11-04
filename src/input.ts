@@ -9,6 +9,7 @@ import {
   commandWidth,
   endWidth,
   filesForLateral,
+  widestFiles,
 } from './sim/orders'
 import type { Battle } from './sim/types'
 import { MAP_HEIGHT, MAP_WIDTH } from './sim/types'
@@ -113,6 +114,8 @@ export function attachInput(
     const battle = getBattle()
     const hovered = regimentAt(battle, point.x, point.y)
     pointer.hoverId = hovered?.id ?? null
+    const attackable = !!hovered && hovered.side === 1 && playerIds(battle, getSelection()).length > 0
+    canvas.style.cursor = attackable ? 'crosshair' : ''
     if (session.pointerId !== event.pointerId || session.mode === 'none') return
     if (session.mode === 'pan') {
       camera.x -= (point.sx - session.panX) / camera.zoom
@@ -126,7 +129,7 @@ export function attachInput(
       if (!reg) return
       const axis = right(reg.facing)
       const lateral = (point.x - reg.anchorX) * axis.x + (point.y - reg.anchorY) * axis.y
-      commandWidth(battle, reg.id, filesForLateral(unitDef(reg.type).spacing, lateral, reg.aliveCount))
+      commandWidth(battle, reg.id, filesForLateral(unitDef(reg.type).spacing, lateral, widestFiles(reg)))
       return
     }
     const moved = Math.hypot(point.sx - session.sx, point.sy - session.sy)

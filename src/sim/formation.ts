@@ -1,5 +1,6 @@
 import { angDiff, clamp, forward, right } from './math'
 import type { Battle, Regiment, Soldier, UnitDef } from './types'
+import { MAP_HEIGHT, MAP_WIDTH } from './types'
 import { unitDef } from './units'
 
 export interface Vec2 {
@@ -70,106 +71,61 @@ export function maxRankOf(reg: Regiment): number {
   return maxRank
 }
 
-interface BodyFrame {
-  minRight: number
-  maxRight: number
-  minForward: number
-  maxForward: number
-}
-
-function bodyFrame(reg: Regiment, def: UnitDef): BodyFrame | null {
-  const fwd = forward(reg.facing)
-  const rgt = right(reg.facing)
-  let minRight = Infinity
-  let maxRight = -Infinity
-  let minForward = Infinity
-  let maxForward = -Infinity
+export function massCenter(reg: Regiment): Vec2 {
+  let x = 0
+  let y = 0
   let count = 0
   for (const soldier of reg.soldiers) {
     if (!soldier.alive) continue
-    const localRight = soldier.x * rgt.x + soldier.y * rgt.y
-    const localForward = soldier.x * fwd.x + soldier.y * fwd.y
-    minRight = Math.min(minRight, localRight)
-    maxRight = Math.max(maxRight, localRight)
-    minForward = Math.min(minForward, localForward)
-    maxForward = Math.max(maxForward, localForward)
+    x += soldier.x
+    y += soldier.y
     count += 1
   }
-  if (count === 0) return null
-  const pad = def.radius + 0.45
-  return {
-    minRight: minRight - pad,
-    maxRight: maxRight + pad,
-    minForward: minForward - pad,
-    maxForward: maxForward + pad,
-  }
+  if (count === 0) return { x: reg.anchorX, y: reg.anchorY }
+  return { x: x / count, y: y / count }
 }
 
-function frameCorner(reg: Regiment, localRight: number, localForward: number): Vec2 {
-  const fwd = forward(reg.facing)
-  const rgt = right(reg.facing)
-  return {
-    x: rgt.x * localRight + fwd.x * localForward,
-    y: rgt.y * localRight + fwd.y * localForward,
-  }
+function nominalHalf(reg: Regiment, def: UnitDef): { halfW: number; halfD: number } {
+  const halfW = ((Math.max(1, reg.files) - 1) * def.spacing) / 2 + def.radius + 0.7
+  const halfD = (maxRankOf(reg) * def.rankSpacing) / 2 + def.radius + 0.7
+  return { halfW, halfD: Math.max(halfD, def.radius + 0.7) }
 }
 
 export function formationCorners(reg: Regiment, def: UnitDef): Vec2[] {
-  const frame = bodyFrame(reg, def)
-  if (!frame) {
-    const halfW = ((Math.max(1, reg.files) - 1) * def.spacing) / 2 + def.radius
-    const depth = maxRankOf(reg) * def.rankSpacing + def.radius
-    const fwd = forward(reg.facing)
-    const rgt = right(reg.facing)
-    const corner = (lx: number, ly: number): Vec2 => ({
-      x: reg.anchorX + rgt.x * lx + fwd.x * ly,
-      y: reg.anchorY + rgt.y * lx + fwd.y * ly,
-    })
-    return [
-      corner(-halfW, def.radius + 0.3),
-      corner(halfW, def.radius + 0.3),
-      corner(halfW, -depth),
-      corner(-halfW, -depth),
-    ]
-  }
-  return [
-    frameCorner(reg, frame.minRight, frame.maxForward),
-    frameCorner(reg, frame.maxRight, frame.maxForward),
-    frameCorner(reg, frame.maxRight, frame.minForward),
-    frameCorner(reg, frame.minRight, frame.minForward),
-  ]
+  const center = massCenter(reg)
+  const { halfW, halfD } = nominalHalf(reg, def)
+  const fwd = forward(reg.facing)
+  const rgt = right(reg.facing)
+  const corner = (lx: number, ly: number): Vec2 => ({
+    x: center.x + rgt.x * lx + fwd.x * ly,
+    y: center.y + rgt.y * lx + fwd.y * ly,
+  })
+  return [corner(-halfW, halfD), corner(halfW, halfD), corner(halfW, -halfD), corner(-halfW, -halfD)]
 }
 
 export function flankHandles(reg: Regiment, def: UnitDef): [Vec2, Vec2] {
-  const frame = bodyFrame(reg, def)
-  if (!frame) {
-    const rgt = right(reg.facing)
-    const half = ((Math.max(1, reg.files) - 1) * def.spacing) / 2
-    return [
-      { x: reg.anchorX - rgt.x * half, y: reg.anchorY - rgt.y * half },
-      { x: reg.anchorX + rgt.x * half, y: reg.anchorY + rgt.y * half },
-    ]
-  }
-  return [
-    frameCorner(reg, frame.minRight, frame.maxForward),
-    frameCorner(reg, frame.maxRight, frame.maxForward),
-  ]
+  const center = massCenter(reg)
+  const { halfW, halfD } = nominalHalf(reg, def)
+  const fwd = forward(reg.facing)
+  const rgt = right(reg.facing)
+  const at = (lx: number): Vec2 => ({
+    x: center.x + rgt.x * lx + fwd.x * halfD,
+    y: center.y + rgt.y * lx + fwd.y * halfD,
+  })
+  return [at(-halfW), at(halfW)]
 }
 
 export function pointInFormation(reg: Regiment, x: number, y: number): boolean {
   const def = unitDef(reg.type)
-  const frame = bodyFrame(reg, def)
-  if (!frame) return false
+  const center = massCenter(reg)
+  const { halfW, halfD } = nominalHalf(reg, def)
   const fwd = forward(reg.facing)
   const rgt = right(reg.facing)
-  const localRight = x * rgt.x + y * rgt.y
-  const localForward = x * fwd.x + y * fwd.y
-  return (
-    localRight >= frame.minRight &&
-    localRight <= frame.maxRight &&
-    localForward >= frame.minForward &&
-    localForward <= frame.maxForward
-  )
+  const dx = x - center.x
+  const dy = y - center.y
+  const localRight = dx * rgt.x + dy * rgt.y
+  const localForward = dx * fwd.x + dy * fwd.y
+  return Math.abs(localRight) <= halfW && Math.abs(localForward) <= halfD
 }
 
 export function regimentAt(battle: Battle, x: number, y: number): Regiment | null {
@@ -229,15 +185,20 @@ function formationSlots(
   return slots
 }
 
+/** Files a unit of `alive` men can actually stand in: no wider than its type allows or than it has men. */
+export function fileCount(def: UnitDef, files: number, alive: number): number {
+  return clamp(Math.round(files), 1, Math.max(1, Math.min(alive, def.maxFiles)))
+}
+
 export function assignFormation(reg: Regiment, files: number, ordered?: Soldier[]): void {
   const alive = (ordered ?? reg.soldiers.filter((soldier) => soldier.alive)).filter((soldier) => soldier.alive)
   if (alive.length === 0) {
     reg.files = 1
     return
   }
-  files = clamp(Math.round(files), 1, alive.length)
-  reg.files = files
   const def = unitDef(reg.type)
+  files = fileCount(def, files, alive.length)
+  reg.files = files
   const slots = formationSlots(reg, def, files, alive.length)
   const cost = alive.map((soldier) => slots.map((slot) => (soldier.x - slot.x) ** 2 + (soldier.y - slot.y) ** 2))
   const pick = cheapestAssignment(cost)
@@ -306,6 +267,18 @@ function cheapestAssignment(cost: number[][]): number[] {
 export const PLACE_RADIUS = 8
 
 /**
+ * Foot keep the facing they were given while marching up to this far off it, each man turned toward the
+ * road, so a line sent sideways flank-marches instead of wheeling there and back. Horses always face the road.
+ */
+const OBLIQUE_MARCH = (100 * Math.PI) / 180
+
+/** Which way the block faces while it marches along `heading` to a spot where it must face `destFacing`. */
+export function travelFacing(def: UnitDef, destFacing: number, heading: number): number {
+  if (def.turnRadius > 0) return heading
+  return Math.abs(angDiff(destFacing, heading)) <= OBLIQUE_MARCH ? destFacing : heading
+}
+
+/**
  * Lay the regiment out with a new facing and width. Soldiers are matched to slots as if the new shape
  * stood on top of where they are now, so nobody crosses the block; the frame then moves to (x, y).
  * Without (x, y) the block turns about its own center.
@@ -322,7 +295,7 @@ export function reformAt(reg: Regiment, files: number, facing: number, x?: numbe
   }
   cx /= alive.length
   cy /= alive.length
-  const width = clamp(Math.round(files), 1, alive.length)
+  const width = fileCount(def, files, alive.length)
   const depth = (Math.ceil(alive.length / width) - 1) * def.rankSpacing
   const fwd = forward(facing)
   reg.facing = facing
@@ -333,6 +306,58 @@ export function reformAt(reg: Regiment, files: number, facing: number, x?: numbe
     reg.anchorX = x
     reg.anchorY = y
   }
+}
+
+/**
+ * Lay out a new shape for a block that is about to march off along `facing`, centered on the men as they
+ * stand. A line folding into a column sends its center forward to lead and its flanks fall in behind; a
+ * column opening into a line spreads out around its middle. Nobody waits for the shape to form.
+ */
+export function reformMoving(reg: Regiment, files: number, facing: number): void {
+  const alive = reg.soldiers.filter((soldier) => soldier.alive)
+  if (alive.length === 0) return
+  const def = unitDef(reg.type)
+  const fwd = forward(facing)
+  let cx = 0
+  let cy = 0
+  for (const soldier of alive) {
+    cx += soldier.x
+    cy += soldier.y
+  }
+  cx /= alive.length
+  cy /= alive.length
+  const width = fileCount(def, files, alive.length)
+  const depth = (Math.ceil(alive.length / width) - 1) * def.rankSpacing
+  reg.facing = facing
+  reg.anchorX = cx + (fwd.x * depth) / 2
+  reg.anchorY = cy + (fwd.y * depth) / 2
+  assignFormation(reg, width)
+}
+
+/** Shift a front-center point so the whole block it anchors stands inside the map. */
+export function fitOnMap(reg: Regiment, x: number, y: number, facing: number, files: number): Vec2 {
+  const def = unitDef(reg.type)
+  const alive = Math.max(1, reg.aliveCount)
+  const width = fileCount(def, files, alive)
+  const halfW = ((width - 1) * def.spacing) / 2 + def.radius + 0.5
+  const depth = (Math.ceil(alive / width) - 1) * def.rankSpacing + def.radius + 0.5
+  const fwd = forward(facing)
+  const rgt = right(facing)
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const [side, back] of [[-halfW, -def.radius - 0.5], [halfW, -def.radius - 0.5], [-halfW, depth], [halfW, depth]]) {
+    const cx = x + rgt.x * side - fwd.x * back
+    const cy = y + rgt.y * side - fwd.y * back
+    minX = Math.min(minX, cx)
+    maxX = Math.max(maxX, cx)
+    minY = Math.min(minY, cy)
+    maxY = Math.max(maxY, cy)
+  }
+  const shiftX = minX < 0 ? -minX : maxX > MAP_WIDTH ? MAP_WIDTH - maxX : 0
+  const shiftY = minY < 0 ? -minY : maxY > MAP_HEIGHT ? MAP_HEIGHT - maxY : 0
+  return { x: x + shiftX, y: y + shiftY }
 }
 
 export function compactRanks(reg: Regiment): void {

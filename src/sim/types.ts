@@ -1,9 +1,9 @@
-export const MAP_WIDTH = 130
-export const MAP_HEIGHT = 200
+export const MAP_WIDTH = 300
+export const MAP_HEIGHT = 230
 export const SIM_DT = 0.05
 
 export type Side = 0 | 1
-export type UnitType = 'infantry' | 'cavalry' | 'archer' | 'musket' | 'chariot'
+export type UnitType = 'spear' | 'sword' | 'greatsword' | 'heavyCavalry' | 'lightCavalry' | 'archer' | 'musket' | 'chariot'
 export type OrderKind = 'hold' | 'move' | 'attack'
 export type Fatigue = 'fresh' | 'winded' | 'exhausted'
 
@@ -20,6 +20,10 @@ export interface MissileDef {
   far: number
   /** Arrows drop on the landing point. Bullets strike the first body on the path. */
   arc: boolean
+  /** Full firing arc in degrees, centered on the regiment's facing. */
+  cone: number
+  /** Shots each soldier carries. */
+  ammo: number
 }
 
 export interface UnitDef {
@@ -27,6 +31,8 @@ export interface UnitDef {
   name: string
   models: number
   files: number
+  /** Widest the unit can stand, in files. */
+  maxFiles: number
   hp: number
   meleeAttack: number
   meleeDefense: number
@@ -37,11 +43,23 @@ export interface UnitDef {
   reach: number
   speed: number
   chargeSpeed: number
+  /** How fast turning can build up or ease off, rad/s². */
+  turnAccel: number
+  /** Fastest turn, rad/s. */
+  turnCap: number
+  /** Tightest circle while rolling, m. 0 for men on foot. */
+  turnRadius: number
+  /** Fastest turn while standing still, rad/s. Only matters when `turnRadius` > 0. */
+  pivotRate: number
   mass: number
   chargeBonus: number
   impactPower: number
   antiLargeMa: number
   antiLargeWs: number
+  /** Melee attack added against spear, sword, and greatsword. */
+  antiInfantryMa: number
+  /** Weapon damage added against spear, sword, and greatsword. */
+  antiInfantryWs: number
   shieldBlock: number
   canBrace: boolean
   leadership: number
@@ -67,6 +85,8 @@ export interface Soldier {
   vy: number
   /** Walking speed along `facing`. Soldiers accelerate and brake; they never step sideways. */
   speed: number
+  /** Current turning speed, rad/s. Builds up and eases off; it never jumps. */
+  omega: number
   /** Standing in its slot. Small shoves are ignored until the soldier drifts clearly out. */
   idle: boolean
   facing: number
@@ -78,6 +98,8 @@ export interface Soldier {
   deathTime: number
   meleeCd: number
   reload: number
+  /** Shots left. Melee soldiers stay at 0. */
+  ammo: number
   disengage: number
   leaving: boolean
   fleeX: number
@@ -85,6 +107,11 @@ export interface Soldier {
   latched: number[]
   cleave: number
   flash: number
+  /** Seconds left on the ground. Zero means standing. */
+  down: number
+  /** Velocity of the throw, in m/s. It dies away while the soldier is down. */
+  knockVx: number
+  knockVy: number
 }
 
 export interface DamageEvent {
@@ -113,7 +140,6 @@ export interface Regiment {
   exertion: number
   fatigue: Fatigue
   restTime: number
-  chargeTimer: number
   wantCharge: boolean
   anchorSpeed: number
   turnRate: number
@@ -122,10 +148,14 @@ export interface Regiment {
   frameVy: number
   /** Mean distance between soldiers and their slots last step. */
   lag: number
+  /** Mean distance soldiers are behind their slots along the facing; men beside or ahead of their slot count zero. */
+  trail: number
   /** Mean speed of the soldiers themselves last step. */
   bodySpeed: number
   stationaryTime: number
   braceSlow: number
+  /** Seconds a chariot keeps driving after running over men who were not braced. */
+  plow: number
   bogTime: number
   bogged: boolean
   routing: boolean
@@ -141,6 +171,10 @@ export interface Regiment {
   shot: boolean
   engaged: boolean
   nearEnemy: boolean
+  /** A melee blow has landed. While this is set the block turns toward the enemy. */
+  meleeReact: boolean
+  /** Regiment that landed a rear melee blow. Faced until it is no longer behind. */
+  rearFoe: number | null
 }
 
 export interface Projectile {
