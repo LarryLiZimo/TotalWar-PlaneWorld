@@ -53,6 +53,9 @@ export function unitPanelData(reg:Regiment,bracing=false) {
     if(def.resistances[key]) add(key,`${label} ${Math.round(def.resistances[key]*100)}%`,'符合伤害类型时生效。')
   }
   if(def.missile?.fireWhileMoving) add('mobile','移动射击','移动时仍可射击。')
+  if(def.missile?.bonusVsLarge) add('missileLarge',`远程反大型 +${def.missile.bonusVsLarge}`,'仅弹丸命中大型目标时生效；按弹丸普通/破甲比例分配额外伤害。')
+  if((def.missile?.penetration??1)>1) add('penetration',`穿透 ${def.missile!.penetration}`,`命中时按目标身体阻力扣除预算；穿透后保留 ${Math.round(def.missile!.penetrationDamage*100)}% 伤害。`)
+  if((def.missile?.shotsPerVolley??1)>1) add('volley',`齐射 ${def.missile!.shotsPerVolley} 发`,'每个模型一次装填发射的弹丸数；每发独立散布，弹药按轮计。')
   const escaped=reg.soldiers.filter(s=>s.escaped).length
   const order=reg.aliveCount<=0?(escaped?'已退场':'覆灭'):reg.routing?'溃逃':reg.engaged?'近战':reg.order==='attack'?'攻击':reg.order==='move'?(reg.run?'跑步':'走路'):'坚守'
   const status=[order,FATIGUE_NAMES[reg.fatigue],reg.moraleState==='wavering'?'动摇':'',reg.shattered?'彻底溃散':'',reg.soldiers.some(s=>s.alive&&s.wounded)?'负伤':'',bracing?'列阵':''].filter(Boolean).join(' · ')

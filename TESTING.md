@@ -18,10 +18,10 @@
 
 测试数量以 `npm test` 输出为准；改机制时开 `npm run test:watch`，完成一处修改后跑 `npm run test:regression`，收尾跑 `npm run check`。本节记录已覆盖行为，现行机制见 [RULES.md](RULES.md)，操作见 [CONTROLS.md](CONTROLS.md)，具体场景见 [BATTLEFIELDS.md](BATTLEFIELDS.md)。阶段截图和性能样本见 [reports/README.md](reports/README.md)。
 
-- 四套预设双方独立选择、所有规模人数/阵位合法；单体生命按规模变化，负伤与士气按当局最大生命计算。
+- 十套预设双方独立选择、所有规模人数/阵位合法；单体生命按规模变化，负伤与士气按当局最大生命计算。
 - Worker 初始化、状态传输、命令等价、角度跨界插值、成批到达平滑、暂停定格及显示点选一致；240 人减员补齐前排。
 - 命中上下限、护甲仅减不破甲、质量/速度/列阵影响碰撞、冲锋的 13 秒衰减。
-- 全 18 个兵种按个人有效速度获得冲锋，近距离/散队/整队朝向不构成门槛；低速和外推不能触发，步兵对反大型防御仍可冲锋，正面普通部队不取消加成。
+- 全 39 个兵种按个人有效速度获得冲锋，近距离/散队/整队朝向不构成门槛；低速和外推不能触发，步兵对反大型防御仍可冲锋，正面普通部队不取消加成。
 - 本步刚达到冲锋速度、接触停车、后来减速、疲劳速度、重复攻击均检查；前摇包含在间隔内，恢复与间隔并行，避免改成叠加等待。
 - 前排已经接敌时，七类后排仍能提速并独立获得冲锋；完整 36 骑兵散阵对 80 矛兵检查后备群体跑速与实际接敌，手选走路保持步速，贴敌前排仍停车，不能把整队接战误用成每个人的慢速限制。
 - 整列减员后补齐完整前排、短末排居中，身体不瞬移，最终站位误差收紧；战车近点行进转向并确实到达，不会永远绕圈。
@@ -54,6 +54,8 @@
 - 多个种子重放结果严格一致；场景中坐标/生命/弹药/人数保持合法；空间网格扩容后不漏模型。
 
 测试位于 `tests/combat.test.ts`、`tests/regressions.test.ts`、`tests/input.test.ts`、`tests/mechanics.test.ts`、`tests/terror.test.ts`、`tests/grounding.test.ts`、`tests/unit-panel.test.ts`、`tests/soft-contact.test.ts`、`tests/armies.test.ts`、`tests/transport.test.ts`、`tests/charge.test.ts`、`tests/rout-exit.test.ts`、`tests/render.test.ts`。不会只检查“程序没崩”；回归场景断言人物是否受伤、是否转身、弹药是否减少、骑兵是否真的离开。
+
+新增帝国模板兵种见 `tests/roster.test.ts`：21 种单位移动/交战、精锐编制、预设全覆盖、预算、六发齐射、移动射击、猎手远程反大型伤害、鞭笞者永不溃逃及新混编严格重放。
 
 ## 页面中的固定场景
 

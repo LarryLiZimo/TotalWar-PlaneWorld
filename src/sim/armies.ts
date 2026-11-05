@@ -10,6 +10,12 @@ export const ARMIES={
   advance:{name:'重装推进',units:[['sword',4],['spear',3],['greatsword',2],['ogre',2],['armoredOgre',2],['heavyCavalry',1],['shieldCavalry',1]]},
   nomad:{name:'游牧机动',units:[['sword',2],['spear',3],['horseArcher',4],['lightCavalry',4],['chariot',2]]},
   monsters:{name:'巨兽与英雄',units:[['spear',4],['monster',4],['behemoth',4],['inquisitor',2],['general',1]]},
+  stateTroops:{name:'行省征召',units:[['militia',3],['shieldSpear',4],['sword',2],['crossbow',3],['freeCompany',2],['captain',1]]},
+  blackpowder:{name:'黑火药战线',units:[['shieldSpear',3],['halberd',2],['ironsides',3],['longRifle',2],['musket',2],['outrider',2],['general',1]]},
+  knightly:{name:'骑士突击',units:[['sword',2],['shieldSpear',2],['reiksguard',3],['blackRose',2],['demigryph',2],['demigryphHalberd',2],['pistolier',1],['general',1]]},
+  fanatics:{name:'信仰远征',units:[['flagellant',6],['greatsword',2],['huntsmen',3],['warriorPriest',2],['lightCavalry',1],['captain',1]]},
+  warTrain:{name:'机动战车',units:[['shieldSpear',3],['freeCompany',3],['warWagon',3],['heavyChariot',2],['pistolier',2],['outrider',1],['general',1]]},
+  monstrousGuard:{name:'巨兽卫队',units:[['shieldSpear',3],['ogreGreatWeapon',3],['ogreHalberd',3],['giant',2],['stoneBeast',2],['huntsmen',1],['warriorPriest',1]]},
 } as const satisfies Record<string,{name:string;units:readonly (readonly [UnitType,number])[]}>
 export type ArmyId=keyof typeof ARMIES
 export interface ArmySetup {player:ArmyId;enemy:ArmyId;scale:ArmyScale}
@@ -17,7 +23,7 @@ export const DEFAULT_SETUP:ArmySetup={player:'classic',enemy:'advance',scale:4}
 
 export function unitModels(type:UnitType,scale:ArmyScale=4):number {
   const d=unitDef(type)
-  const standard=d.category==='monster'||d.models===1?0:d.category==='chariot'?4:d.category==='monstrousInfantry'?12:d.category==='cavalry'?60:d.category==='ranged'?68:120
+  const standard=d.category==='monster'||d.models===1?0:d.standardModels??(d.category==='chariot'?4:d.category==='monstrousInfantry'?12:d.category==='cavalry'?60:d.category==='ranged'?68:120)
   return standard?standard*scale/4:1
 }
 export function scaledFormation(type:UnitType,scale:ArmyScale):{models:number;files:number;hp:number} {
@@ -26,7 +32,7 @@ export function scaledFormation(type:UnitType,scale:ArmyScale):{models:number;fi
   return {models,files:fileCount(d,Math.ceil(models/ranks),models),hp:d.hp*(d.models===1?scale/4:1)}
 }
 export function armySummary(id:ArmyId,scale:ArmyScale) {
-  return {regiments:ARMIES[id].units.reduce((n,[,count])=>n+count,0),models:ARMIES[id].units.reduce((n,[type,count])=>n+unitModels(type,scale)*count,0)}
+  return {regiments:ARMIES[id].units.reduce((n,[,count])=>n+count,0),models:ARMIES[id].units.reduce((n,[type,count])=>n+unitModels(type,scale)*count,0),budget:ARMIES[id].units.reduce((n,[type,count])=>n+unitDef(type).cost*count,0)}
 }
 export function createArmyBattle(setup:ArmySetup=DEFAULT_SETUP,seed=20261104):Battle {
   const battle=createEmptyBattle(seed)

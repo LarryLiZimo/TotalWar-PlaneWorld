@@ -55,9 +55,10 @@ describe('rolling chariot manoeuvres and extraction',()=> {
     expect(Math.hypot(r.soldiers[0].x-goalX,r.soldiers[0].y-goalY)).toBeLessThan(1.2)
   })
 
-  it('extracts a slow chariot through a few ordinary infantry without needing impact speed',()=> {
-    const b=createEmptyBattle(73),cart=one(b,0,'chariot',100,100,0)
+  it.each(['chariot','heavyChariot','warWagon'] as const)('extracts a slow %s through a few ordinary infantry without needing impact speed',type=> {
+    const b=createEmptyBattle(73),cart=one(b,0,type,100,100,0)
     const feet=[[102.2,99.1],[102.2,100],[102.2,100.9],[103,99.55],[103,100.45]].map(([x,y])=>one(b,1,'sword',x,y,0))
+    for(const s of cart.soldiers) s.ammo=0
     cart.bogged=true;commandMove(b,[cart.id],125,100,null)
     let fastestInContact=0
     for(let i=0;i<160;i++) {step(b,0.05);if(cart.inContact) fastestInContact=Math.max(fastestInContact,cart.soldiers[0].speed)}

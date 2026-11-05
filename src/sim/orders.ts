@@ -118,7 +118,7 @@ export function commandAttack(battle: Battle, ids: number[], targetId: number): 
     if (reg.order!=='attack' || reg.targetId!==targetId) {
       const inMelee=reg.engaged || reg.inContact || reg.retargeting
       resetMovement(reg)
-      reg.retargeting=inMelee && !unitDef(reg.type).missile && reg.type!=='chariot'
+      reg.retargeting=inMelee && !unitDef(reg.type).missile && unitDef(reg.type).category!=='chariot'
     }
     reg.order = 'attack'
     reg.targetId = targetId

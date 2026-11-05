@@ -8,6 +8,7 @@ try {
   const { MECHANICS } = await server.ssrLoadModule('/src/sim/mechanics.ts')
   const { ARMIES,ARMY_SCALES,unitModels,scaledFormation,armySummary } = await server.ssrLoadModule('/src/sim/armies.ts')
   const units = Object.values(UNITS)
+  const armyCount = Object.keys(ARMIES).length
   const categories = { infantry:'步兵', ranged:'远程步兵', cavalry:'骑兵', chariot:'战车', monstrousInfantry:'怪兽步兵', monster:'怪兽' }
   const weapons = { spear:'长矛', sword:'刀盾/剑', greatsword:'巨剑', bow:'弓/弩', musket:'火枪', halberd:'戟', claws:'双爪' }
   const sizes = ['极小','步行','骑乘','怪步/战车','巨兽']
@@ -28,15 +29,16 @@ try {
 - [队形、移动与身体](UNITS/MOVEMENT.md)
 - [射击、散布与穿透](UNITS/RANGED.md)
 - [冲锋防御、碰撞攻击与特殊能力](UNITS/ABILITIES.md)
-- [四套军队与规模换算](UNITS/ARMIES.md)
+- [预设军队与规模换算](UNITS/ARMIES.md)
+- [帝国模板设计与来源](ROSTER-DESIGN.md)
 
 ## 编制与定位
 
-${table(['代码','名称','类别','4×人数','4×单人生命','武器','反体型分类','定位'],units.map(d=>[d.type,d.name,categories[d.category],unitModels(d.type,4),d.hp,weapons[d.weapon],d.large?'大型':'小型',d.type==='heavyCavalry'?'枪骑：高冲锋，接敌转近战':d.type==='shieldCavalry'?'刀盾：攻防与盾牌，持续作战':d.type==='horseArcher'?'360° 射界，可移动射击':d.type==='ogre'?'低甲高机动，多目标攻击':d.type==='armoredOgre'?'高甲破甲，机动较低':d.type==='monster'?'低甲高机动，恐惧/惊骇':d.type==='behemoth'?'重甲低速，恐惧/惊骇':d.chargeDefense!=='none'?'列阵抵消冲锋，独立反大型加成':d.antiInfantryMa?'破甲反步兵':d.missile?'远程支援':d.models===1?'单体，群攻共享伤害预算':'常规近战']))}
+${table(['代码','名称','类别','预算点','4×人数','4×单人生命','武器','反体型分类','定位'],units.map(d=>[d.type,d.name,categories[d.category],d.cost,unitModels(d.type,4),d.hp,weapons[d.weapon],d.large?'大型':'小型',d.role]))}
 
 “类别”“大型 / 小型”“物理体型”和“质量”分别定义，不能从其中一项推导其他项。含义见[对象与属性](RULES.md#一战场中的对象与属性)。
 
-普通预设采用可选规模；旧完整会战与固定复现场景沿用各自模板，见[战场配置](BATTLEFIELDS.md)。
+现有 ${units.length} 种共享兵种、${armyCount} 套预设。预算点按标准规模的每队编制给出，在同倍率下比较组合，不随规模另乘；界面不设预算上限，预设尚未按同点数配平。旧完整会战与固定复现场景沿用各自模板，见[战场配置](BATTLEFIELDS.md)。
 `,
     'UNITS/COMBAT.md': `# 战斗属性与攻击动作
 
@@ -70,21 +72,21 @@ ${table(['名称','最快度/秒','加速度度/秒²','转弯半径米','原地
 
 [返回单位目录](../UNITS.md)。本页列具体武器和弹药配置，射击条件、弹丸、盾牌和友伤见[射击规则](../RULES.md#五射击与弹丸)。
 
-威力分不破甲 / 破甲，装填单位秒，距离单位米，角度单位度。穿透预算决定途中还能穿过多少身体阻力；“穿透后伤害”为继续飞行时保留的倍率。
+威力分不破甲 / 破甲，装填单位秒，距离单位米，角度单位度。弹药按轮计，威力按单发计，“每轮弹丸”列为每次装填发出的弹丸数。穿透预算决定途中还能穿过多少身体阻力；“穿透后伤害”为继续飞行时保留的倍率；“反大型额伤”只作用于命中大型目标的弹丸。
 
-${table(['名称','不破甲/破甲','装填秒','射程米','射界度','弹药','弹速米/秒','角度散布','校准距离/半径米','穿透预算','穿透后伤害','移动开火','弹道'],units.filter(d=>d.missile).map(d=>{const m=d.missile;return [d.name,`${m.base}/${m.ap}`,m.reload,m.range,m.cone,m.ammo,m.speed,`±${m.spread}°`,`${m.calibrationDistance}/${m.calibrationRadius}`,m.penetration,pct(m.penetrationDamage),yes(m.fireWhileMoving),m.arc?'弧线':'火枪']}))}
+${table(['名称','不破甲/破甲','装填秒','射程米','射界度','弹药','弹速米/秒','角度散布','校准距离/半径米','反大型额伤','每轮弹丸','穿透预算','穿透后伤害','移动开火','弹道'],units.filter(d=>d.missile).map(d=>{const m=d.missile;return [d.name,`${m.base}/${m.ap}`,m.reload,m.range,m.cone,m.ammo,m.speed,`±${m.spread}°`,`${m.calibrationDistance}/${m.calibrationRadius}`,m.bonusVsLarge??0,m.shotsPerVolley??1,m.penetration,pct(m.penetrationDamage),yes(m.fireWhileMoving),m.arc?'弧线':'火枪']}))}
 
 “校准距离 / 半径”定义散布圆随距离的变化，见[弹丸规则](../RULES.md#2-弹丸怎样飞行与命中)。本作枪口安全区与末端友伤范围见[友伤规则](../RULES.md#4-友军遮挡与友伤)。
 `,
-    'UNITS/ARMIES.md': `# 四套军队与规模
+    'UNITS/ARMIES.md': `# ${armyCount} 套预设军队与规模
 
-[返回单位目录](../UNITS.md)。本页只列军队编成与规模换算，选择方法见 [CONTROLS.md](../CONTROLS.md#开始与重开)，地图与部署见 [BATTLEFIELDS.md](../BATTLEFIELDS.md)。每套均为 15 队，尚未按费用配平。
+[返回单位目录](../UNITS.md)。本页只列军队编成与规模换算，选择方法见 [CONTROLS.md](../CONTROLS.md#开始与重开)，地图与部署见 [BATTLEFIELDS.md](../BATTLEFIELDS.md)。每套均为 15 队，表中预算点用于比较，尚未按同点数配平。
 
-${table(['代码','军队','编成','4×模型总数'],Object.entries(ARMIES).map(([id,a])=>[id,a.name,a.units.map(([type,count])=>`${count} ${UNITS[type].name}`).join('、'),armySummary(id,4).models]))}
+${table(['代码','军队','编成','4×模型总数','预算点'],Object.entries(ARMIES).map(([id,a])=>[id,a.name,a.units.map(([type,count])=>`${count} ${UNITS[type].name}`).join('、'),armySummary(id,4).models,armySummary(id,4).budget]))}
 
 ## 每队人数
 
-${table(['类型',...ARMY_SCALES.map(s=>`${s}×`)],([['步兵','sword'],['骑兵/骑射','heavyCavalry'],['远程步兵','archer'],['怪步','ogre'],['战车','chariot'],['怪兽/英雄','monster']]).map(([name,type])=>[name,...ARMY_SCALES.map(s=>unitModels(type,s))]))}
+${table(['类型',...ARMY_SCALES.map(s=>`${s}×`)],([['步兵','sword'],['骑兵/骑射','heavyCavalry'],['远程步兵','archer'],['铁甲火枪','ironsides'],['长管步枪/半狮鹫','longRifle'],['怪步','ogre'],['战车','chariot'],['怪兽/英雄','monster']]).map(([name,type])=>[name,...ARMY_SCALES.map(s=>unitModels(type,s))]))}
 
 ## 单体生命
 
@@ -100,11 +102,11 @@ ${table(['单位',...ARMY_SCALES.map(s=>`${s}×生命`)],units.filter(d=>d.model
 
 动能列为碰撞威力 / 每轮人数；碰撞攻击列为间隔秒 / 目标数 / 武器倍率；负伤列为触发生命比例 / 剩余伤害倍率 / 剩余普通速度倍率。
 
-${table(['名称','冲锋防御','冲锋反制','动能碰撞威力/人数','碰撞攻击 间隔秒/人数/武器倍率','负伤阈值/伤害/常速','鼓舞','将军','恐惧','惊骇'],units.map(d=>[d.name,({none:'无',large:'抵御大型',all:'抵御全部'})[d.chargeDefense],yes(d.chargeReflection),`${d.impactPower}/${d.cleave}`,d.collisionAttack?`${d.collisionAttack.interval}/${d.collisionAttack.targets}/${d.collisionAttack.damage}`:'无',d.wounds?`${pct(d.wounds.threshold)}/${pct(d.wounds.damage)}/${pct(d.wounds.speed)}`:'无',d.encourage,yes(d.commander),yes(d.causesFear),yes(d.causesTerror)]))}
+${table(['名称','冲锋防御','冲锋反制','动能碰撞威力/人数','碰撞攻击 间隔秒/人数/武器倍率','负伤阈值/伤害/常速','鼓舞','将军','恐惧','惊骇','免疫心理','永不溃逃','物/射/火/法/特抗性'],units.map(d=>[d.name,({none:'无',large:'抵御大型',all:'抵御全部'})[d.chargeDefense],yes(d.chargeReflection),`${d.impactPower}/${d.cleave}`,d.collisionAttack?`${d.collisionAttack.interval}/${d.collisionAttack.targets}/${d.collisionAttack.damage}`:'无',d.wounds?`${pct(d.wounds.threshold)}/${pct(d.wounds.damage)}/${pct(d.wounds.speed)}`:'无',d.encourage,yes(d.commander),yes(d.causesFear),yes(d.causesTerror),yes(d.immunePsychology),yes(d.unbreakable),[d.resistances.physical,d.resistances.missile,d.resistances.fire,d.resistances.spell,d.resistances.ward].map(pct).join("/")]))}
 
 冲锋防御与反制见[列阵规则](../RULES.md#4-站稳迎击冲锋防御与反制)，动能与独立碰撞攻击见[碰撞伤害](../RULES.md#7-动能冲撞碰撞攻击和击倒)，恐惧和来源惊骇冷却见[心理规则](../RULES.md#2-恐惧与惊骇分别是什么)，永久负伤见[负伤规则](../RULES.md#2-单体负伤)。
 
-当前所有兵种的物理、远程、火焰、法术、特保抗性均为 0；免疫心理和永不溃败均为否。伤害通道已有规则支持，现有内容未配置魔法 / 火焰攻击，也没有完整法术或不死族崩解系统。
+鞭笞者永不溃逃且免疫心理；黑玫瑰、磐石巨兽和战斗牧师免疫心理。磐石巨兽物理抗性 15%，战斗牧师 10%，其余抗性见表。战斗牧师只有既有鼓舞、近战和抗性，没有主动法术；现有内容仍没有完整法术、火焰弹药或不死族崩解系统。
 `,
   }
   await mkdir('UNITS', { recursive: true })

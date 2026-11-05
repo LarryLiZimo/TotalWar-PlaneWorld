@@ -64,8 +64,19 @@ try {
  clearInterval(timer);post({kind:'control',paused:true,speed:1});post({kind:'snapshot',requestId:43})
  snapshot=(await next(value=>value.kind==='snapshot'&&value.requestId===43)).snapshot
  assert.deepEqual(snapshot.errors,[]);assert.ok(snapshot.time>.55)
+ // Newly added types must also initialize and step through the production worker.
+ post({kind:'init',source:{scenario:'custom',seed:199,setup:{player:'blackpowder',enemy:'warTrain',scale:8}},paused:true,speed:1})
+ const expanded=await next(value=>value.kind==='init')
+ assert.equal(expanded.battle.regiments.find(r=>r.type==='ironsides').soldiers.length,120)
+ assert.equal(expanded.battle.regiments.find(r=>r.type==='longRifle').soldiers.length,64)
+ assert.equal(expanded.battle.regiments.find(r=>r.type==='warWagon').soldiers.length,8)
+ post({kind:'step'});await next(value=>value.kind==='frame'&&value.frame.time>0)
+ post({kind:'snapshot',requestId:44})
+ const expandedSnapshot=(await next(value=>value.kind==='snapshot'&&value.requestId===44)).snapshot
+ assert.deepEqual(expandedSnapshot.errors,[])
+ assert.equal(expandedSnapshot.regiments.length,30)
  const sorted=gaps.toSorted((a,b)=>a-b)
- const result={date:new Date().toISOString(),workerAsset:asset,scale:8,models:initial.battle.regiments.reduce((n,r)=>n+r.soldiers.length,0),simulatedSeconds:snapshot.time,checks:['real worker init','8x single health','queued move','walk toggle','fixed single steps','width change','transfer and recycle','authoritative snapshot'],errors:snapshot.errors,mainHeartbeat:{intervalMs:10,samples:gaps.length,p95Ms:sorted[Math.floor(sorted.length*.95)],maxMs:sorted.at(-1)}}
+ const result={date:new Date().toISOString(),workerAsset:asset,scale:8,models:initial.battle.regiments.reduce((n,r)=>n+r.soldiers.length,0),simulatedSeconds:snapshot.time,checks:['real worker init','8x single health','queued move','walk toggle','fixed single steps','width change','transfer and recycle','authoritative snapshot','expanded roster 8x init and step'],errors:snapshot.errors,mainHeartbeat:{intervalMs:10,samples:gaps.length,p95Ms:sorted[Math.floor(sorted.length*.95)],maxMs:sorted.at(-1)}}
  await mkdir('reports',{recursive:true});await writeFile('reports/worker-check.json',JSON.stringify(result,null,2)+'\n')
  console.log(JSON.stringify(result,null,2))
 } finally {for(const w of waiters)clearTimeout(w.timer);await worker.terminate()}

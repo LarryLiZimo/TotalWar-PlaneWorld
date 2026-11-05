@@ -44,7 +44,9 @@ function bodiesOf(battle:Battle):Body[] {
 }
 
 export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
-  const ctx = canvas.getContext('2d',{alpha:false,desynchronized:true})
+  // Present completed frames through the compositor. Low-latency front-buffer
+  // rendering can expose our intermediate background repaint as a visible flash.
+  const ctx = canvas.getContext('2d',{alpha:false,desynchronized:false})
   if (!ctx) return
   const { width, height } = canvas
   const { battle, camera } = view
@@ -54,7 +56,7 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   if(cacheSprites) prepareGlyphs(battle,camera.zoom)
   const requestedBatch=cacheSprites&&battle.regiments.reduce((n,r)=>n+r.aliveCount,0)>=256?spriteBatch(canvas):null
   const batch=requestedBatch?.begin(width,height,glyphGeneration)?requestedBatch:null
-  ctx.clearRect(0, 0, width, height)
+  // The opaque background replaces every pixel; clearing first is redundant.
   ctx.fillStyle = '#141812'
   ctx.fillRect(0, 0, width, height)
 

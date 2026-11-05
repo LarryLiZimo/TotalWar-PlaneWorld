@@ -421,7 +421,7 @@ function updateAttackDest(battle: Battle, reg: Regiment): void {
     reg.destFacing = Math.atan2(dy, dx)
     reg.facingLocked = true
   }
-  if (!def.missile && def.type!=='chariot' && reg.engaged && !reg.retargeting) {
+  if (!def.missile && def.category!=='chariot' && reg.engaged && !reg.retargeting) {
     reg.destX = reg.anchorX
     reg.destY = reg.anchorY
     reg.wantCharge = false
@@ -471,7 +471,7 @@ function chargeSpeedReached(battle: Battle, reg: Regiment, def: UnitDef, s: Sold
 function armCharge(battle: Battle, reg: Regiment): void {
   const def = unitDef(reg.type)
   const approaching = reg.run && reg.order === 'attack' && !reg.routing
-  reg.wantCharge = approaching && (!reg.engaged || def.type === 'chariot')
+  reg.wantCharge = approaching && (!reg.engaged || def.category === 'chariot')
   // Speed from the preceding movement step also counts when contact stops the
   // model at the start of this step. A slower subsequent step clears readiness.
   for (const s of reg.soldiers) s.chargeArmed = chargeSpeedReached(battle, reg, def, s, s.speed)
@@ -482,7 +482,7 @@ function moveSpeedOf(reg: Regiment, soldier?: Soldier): number {
   const mods = fatigueMods(reg.fatigue)
   // The formation can be engaged while individual reserves are still running
   // into the fight. Their approach pace must not inherit the frame's slow gait.
-  const charging = (reg.wantCharge || (soldier !== undefined && reg.order === 'attack') || (def.type === 'chariot' && (soldier?.plowLeft ?? 0) > 0)) && reg.run && !reg.routing
+  const charging = (reg.wantCharge || (soldier !== undefined && reg.order === 'attack') || (def.category === 'chariot' && (soldier?.plowLeft ?? 0) > 0)) && reg.run && !reg.routing
   const body = soldier ?? (def.models === 1 ? reg.soldiers[0] : undefined)
   let speed = (charging ? def.chargeSpeed : def.speed * woundMods(def, body).speed) * mods.speed
   if (!reg.run && !charging && !reg.routing) speed *= 0.5
@@ -494,7 +494,7 @@ function moveSpeedOf(reg: Regiment, soldier?: Soldier): number {
 }
 
 function accelRate(def: UnitDef, speedingUp: boolean): number {
-  const base = def.type === 'chariot' ? 2.2 : isCavalry(def.type) ? 2.8 : 1.7
+  const base = def.category === 'chariot' ? 2.2 : isCavalry(def.type) ? 2.8 : 1.7
   return speedingUp ? base : base * 1.7
 }
 
@@ -599,7 +599,7 @@ function moveRegiments(battle: Battle, dt: number): void {
       reg.destY = reg.anchorY
       reg.destFacing = reg.facing
       reg.stationaryTime = 0
-    } else if (def.type==='chariot' && (reg.order==='attack'||reg.order==='move')) {
+    } else if (def.category==='chariot' && (reg.order==='move'||(reg.order==='attack'&&!def.missile))) {
       // The attack frame follows actual carts. It never sends them back to empty slots.
       const center=aliveCenter(reg)!
       reg.facing=reg.order==='move'&&Math.hypot(reg.destX-center.x,reg.destY-center.y)>PLACE_RADIUS?Math.atan2(reg.destY-center.y,reg.destX-center.x):reg.destFacing
@@ -800,8 +800,8 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
     const groundPace = moveSpeedOf(reg, s) * slopeSpeed(battle, s.facing)
     // Only bodies already in weapon reach use melee approach speed. A front
     // rank's contact must not slow distant ranks or detached individual models.
-    let gait = localMelee && reg.engaged && !reg.retargeting && def.type !== 'chariot' && reg.order !== 'move' && !reg.routing ? Math.min(2, groundPace) : groundPace
-    if(def.type==='chariot' && nearby && nearby.def.physicalSize<=1 && gapBetween(s,def,nearby.s,nearby.def)<0.3 && s.speed<5 && s.plowLeft<=0) gait=Math.min(gait,MECHANICS.cartShoveSpeed)
+    let gait = localMelee && reg.engaged && !reg.retargeting && def.category !== 'chariot' && reg.order !== 'move' && !reg.routing ? Math.min(2, groundPace) : groundPace
+    if(def.category==='chariot' && nearby && nearby.def.physicalSize<=1 && gapBetween(s,def,nearby.s,nearby.def)<0.3 && s.speed<5 && s.plowLeft<=0) gait=Math.min(gait,MECHANICS.cartShoveSpeed)
     const lever = turnLever(def)
     const ox = s.x
     const oy = s.y
@@ -813,7 +813,7 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
       lieDown(s, dt)
     } else if(reg.routing) {
       fleeSoldier(battle,reg,def,s,gait,lever,dt)
-    } else if (def.type==='chariot' && (reg.order==='attack'||reg.order==='move') && !reg.routing) {
+    } else if (def.category==='chariot' && (reg.order==='move'||(reg.order==='attack'&&!def.missile)) && !reg.routing) {
       if(reg.order==='attack') driveChariot(battle,reg,def,s,gait,lever,dt)
       else {
         const frame={...reg,anchorX:reg.destX,anchorY:reg.destY,facing:reg.destFacing}
@@ -951,7 +951,7 @@ function chargeAt(
   dt: number,
   press: Press,
 ): boolean {
-  if (def.type === 'chariot') return false
+  if (def.category === 'chariot') return false
   const target = reg.targetId !== null ? regimentById(battle, reg.targetId) : undefined
   if (!target || target.aliveCount <= 0) return false
   if(!press.warmed.has(target)) {
@@ -1338,7 +1338,7 @@ function steer(
   distance: number,
   stopAtGoal = true,
 ): void {
-  if(def.type==='chariot') {
+  if(def.category==='chariot') {
     steerCart(def,s,heading,want,top,dt,maxStep,distance,stopAtGoal)
     return
   }
@@ -1625,7 +1625,7 @@ function resolveShooting(battle: Battle, live: Live[], grid: Spatial, pad: Scrat
       const prey=randomAlive(battle,target)
       if (!prey || !inFireArc(reg,prey.x,prey.y) || Math.hypot(prey.x-soldier.x,prey.y-soldier.y)>missile.range) continue
       if (!missile.arc && !clearShot(battle,live,grid,buf,reg,soldier,prey)) continue
-      spawnArrow(battle,reg,soldier,prey,def)
+      for(let shot=0;shot<(missile.shotsPerVolley??1);shot++) spawnArrow(battle,reg,soldier,prey,def)
       soldier.ammo--; soldier.reload=missile.reload*fatigueMods(reg.fatigue).reload; reg.shot=true
     }
   }
@@ -1789,7 +1789,10 @@ function flyProjectiles(battle: Battle, live: Live[], grid: Spatial, buf: number
       const blocked=item.def.shieldBlock>0 && facingArc(item.s.facing,item.s.x,item.s.y,p.originX,p.originY)==='front' && battle.rng()<item.def.shieldBlock
       if (!blocked) {
         const height=elevationDamage(p.sourceGround-elevationAt(battle,item.s.x,item.s.y),true)
-        hurt(battle,item,regimentById(battle,p.sourceReg)??null,p.base*height,p.ap*height,false,'missile')
+        const source=regimentById(battle,p.sourceReg)??null
+        const missile=source?unitDef(source.type).missile:null
+        const bonus=item.def.large&&missile?(missile.bonusVsLarge??0)/Math.max(1e-9,missile.base+missile.ap):0
+        hurt(battle,item,source,p.base*(1+bonus)*height,p.ap*(1+bonus)*height,false,'missile')
       }
       p.penetrationLeft-=item.def.penetrationResistance
       if (blocked || p.penetrationLeft<=0) { p.alive=false; break }
@@ -1858,7 +1861,7 @@ function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[
       const foot = !hit.item.def.large
       const sprawl = hit.item.def.physicalSize <= 1 || (item.def.physicalSize >= 4 && hit.item.def.physicalSize <= 2)
       if (braced) braceAgainst(item)
-      if (item.def.type === 'chariot' && foot) {
+      if (item.def.category === 'chariot' && foot) {
         item.s.plowLeft=PLOW_TIME
         const speed=Math.hypot(chargeVx,chargeVy)||1
         const fx=chargeVx/speed, fy=chargeVy/speed
@@ -1910,7 +1913,7 @@ function separate(live: Live[], pad: Scratch,dt:number): void {
   const tractionKicks:{foot:Soldier;x:number;y:number}[]=[]
   let tractionGridReady=false
   for(const cart of live) {
-    if(cart.def.type!=='chariot'||cart.reg.routing||cart.s.down>0||cart.s.speed<0.02||cart.s.speed>=5||cart.s.plowLeft>0) continue
+    if(cart.def.category!=='chariot'||cart.reg.routing||cart.s.down>0||cart.s.speed<0.02||cart.s.speed>=5||cart.s.plowLeft>0) continue
     if(!tractionGridReady) {fillGrid(pad,live,false);tractionGridReady=true}
     let resistance=0
     const contacts:{item:Live;nx:number;ny:number}[]=[]
@@ -1966,7 +1969,7 @@ function separate(live: Live[], pad: Scratch,dt:number): void {
         // Ordinary enemies do not grant the same pass-through room as allies.
         // Carts retain the calibrated collider used by their explicit traction
         // and ploughing rules; their force budget decides whether a lane opens.
-        const solidEnemy=enemy&&a.def.type!=='chariot'&&b.def.type!=='chariot'
+        const solidEnemy=enemy&&a.def.category!=='chariot'&&b.def.category!=='chariot'
         const bound=collisionExtent(a.def,solidEnemy)+collisionExtent(b.def,solidEnemy)+MECHANICS.contactPadding
         const dx=b.s.x-a.s.x,dy=b.s.y-a.s.y
         if(dx*dx+dy*dy>=bound*bound) continue
@@ -1984,8 +1987,8 @@ function separate(live: Live[], pad: Scratch,dt:number): void {
         const softDepth=contactSoftDepth(collisionRadius(a.def,solidEnemy)+collisionRadius(b.def,solidEnemy),!enemy)
         const push=contactPush(penetration,softDepth,dt,shellRecovery)
         const firmness=clamp((penetration-softDepth*0.5)/Math.max(1e-6,softDepth*0.5),0,1)
-        const plowA = enemy && a.def.type === 'chariot' && a.s.plowLeft > 0
-        const plowB = enemy && b.def.type === 'chariot' && b.s.plowLeft > 0
+        const plowA = enemy && a.def.category === 'chariot' && a.s.plowLeft > 0
+        const plowB = enemy && b.def.category === 'chariot' && b.s.plowLeft > 0
         const shoveA=traction.has(a.s)&&b.def.physicalSize<=1&&nx*Math.cos(a.s.facing)+ny*Math.sin(a.s.facing)>0.1
         const shoveB=traction.has(b.s)&&a.def.physicalSize<=1&&-nx*Math.cos(b.s.facing)-ny*Math.sin(b.s.facing)>0.1
         // Mass only pushes through an enemy during a fast impact. Melee cavalry and
@@ -2122,7 +2125,7 @@ function finishChargeFatigueBog(battle: Battle, live: Live[], pad: Scratch, dt: 
   fillGrid(pad, live)
   for (const reg of battle.regiments) {
     const def = unitDef(reg.type)
-    if (def.type==='chariot') reg.plow=Math.max(0,...reg.soldiers.filter(s=>s.alive).map(s=>s.plowLeft))
+    if (def.category==='chariot') reg.plow=Math.max(0,...reg.soldiers.filter(s=>s.alive).map(s=>s.plowLeft))
     const target=reg.order==='attack' && reg.targetId!==null?regimentById(battle,reg.targetId):null
     for(const s of reg.soldiers) {
       if(!s.alive||s.down>0||reg.routing||!target||!reg.attackCommitted) {s.blockedTime=0;continue}
@@ -2149,7 +2152,7 @@ function finishChargeFatigueBog(battle: Battle, live: Live[], pad: Scratch, dt: 
     if (def.missile || reg.order === 'move' || reg.routing) reg.engaged = false
     else if (reg.order === 'attack' || reg.order === 'hold') reg.engaged = reg.contactLock > 0 || linePressed(reg, def, live, pad)
 
-    if (def.type === 'chariot') {
+    if (def.category === 'chariot') {
       const slow = reg.anchorSpeed < 3.5 || reg.braceSlow > 0 || reg.bogged
       if (reg.inContact && slow && reg.plow <= 0) reg.bogTime += dt
       else if (!reg.inContact) reg.bogTime = Math.max(0, reg.bogTime - dt)

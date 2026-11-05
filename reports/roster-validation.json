@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-04",
+  "branch": "codex/empire-roster",
+  "base": "015b545",
+  "roster": {
+    "before": 18,
+    "after": 39,
+    "newUnits": 21,
+    "presetsBefore": 4,
+    "presetsAfter": 10
+  },
+  "checks": {
+    "productionBuild": "passed",
+    "unitTests": {
+      "files": 15,
+      "tests": 279,
+      "failed": 0
+    },
+    "existingCombatConfigs": "18 unchanged",
+    "generatedDocumentation": "passed",
+    "worker": {
+      "date": "2026-11-05T02:55:39.258Z",
+      "workerAsset": "battle.worker-DD5lZug4.js",
+      "scale": 8,
+      "models": 3147,
+      "simulatedSeconds": 3.7499999999999947,
+      "checks": [
+        "real worker init",
+        "8x single health",
+        "queued move",
+        "walk toggle",
+        "fixed single steps",
+        "width change",
+        "transfer and recycle",
+        "authoritative snapshot",
+        "expanded roster 8x init and step"
+      ],
+      "errors": [],
+      "mainHeartbeat": {
+        "intervalMs": 10,
+        "samples": 76,
+        "p95Ms": 19.83839999999998,
+        "maxMs": 24.277600000000007
+      }
+    },
+    "realChromeUI": {
+      "time": "00:01",
+      "cards": 15,
+      "detail": "南军长管步枪手1\n\n少量长程精准破甲；猎杀单体，怕包抄与人海 · 900 预算点\n\n坚守 · 精神\n\n1920 / 1920\n\n长管步枪手 · 32 / 32\n\n护甲\n20\n领导力\n60\n速度\n2.8\n近战攻击\n18\n近战防御\n18\n武器威力\n14\n冲锋加成\n0\n射程\n125\n远程威力\n30\n装填\n12.0s\n弹药\n576\n能力\n穿透 2",
+      "banner": null,
+      "setup": {
+        "count": 10,
+        "player": "玩家 · 黑火药战线\n\n15 队 · 1101 个模型 · 11,450 预算点\n\n3 × 持盾长矛兵\n120 / 队\n2 × 重装戟兵\n120 / 队\n3 × 铁甲火枪手\n60 / 队\n2 × 长管步枪手\n32 / 队\n2 × 火枪手\n68 / 队\n2 × 先驱骑兵\n60 / 队\n1 × 帝国将军\n2,560 生命",
+        "enemy": "AI · 机动战车\n\n15 队 · 765 个模型 · 12,450 预算点\n\n3 × 持盾长矛兵\n120 / 队\n3 × 自由民兵\n68 / 队\n3 × 火枪战车\n4 / 队\n2 × 重装冲击战车\n4 / 队\n2 × 手枪骑兵\n60 / 队\n1 × 先驱骑兵\n60 / 队\n1 × 帝国将军\n2,560 生命",
+        "summary": "常规每队：步兵 120 · 骑兵/骑射 60 · 射手 68 · 怪步 12 · 战车 4；精锐：铁甲火枪 60 · 长管步枪/半狮鹫 32；单体生命 ×1"
+      }
+    }
+  },
+  "balanceStatus": "Initial configured values; equal-budget win rates have not been calibrated."
+}
