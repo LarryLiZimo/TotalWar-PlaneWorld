@@ -1,3 +1,5 @@
+import type { BattleCommand } from './commands'
+
 export const MAP_WIDTH = 300
 export const MAP_HEIGHT = 230
 export const SIM_DT = 0.05
@@ -14,8 +16,31 @@ export type UnitType =
   | 'chariot'
   | 'general'
   | 'inquisitor'
+  | 'shieldCavalry'
+  | 'halberd'
+  | 'crossbow'
+  | 'horseArcher'
+  | 'ogre'
+  | 'armoredOgre'
+  | 'monster'
+  | 'behemoth'
 export type OrderKind = 'hold' | 'move' | 'attack'
-export type Fatigue = 'fresh' | 'winded' | 'exhausted'
+export type Fatigue = 'fresh' | 'active' | 'winded' | 'tired' | 'veryTired' | 'exhausted'
+export type MoraleState = 'steady' | 'wavering' | 'routing' | 'shattered'
+export type PhysicalSize = 0 | 1 | 2 | 3 | 4
+export interface AttackProfile {
+  /** Start of a swing to the hit attempt; included within meleeInterval. */
+  windup: number
+  /** Minimum wait after completion, including a miss. Overlaps meleeInterval. */
+  recovery: number
+  arc: number
+  splashMaxSize: PhysicalSize
+}
+export interface CollisionAttackDef { interval: number; targets: number; damage: number }
+export interface WoundsDef { threshold: number; damage: number; speed: number }
+export interface Resistances { physical: number; missile: number; fire: number; spell: number; ward: number }
+export interface DamageTraits { magical?: boolean; flaming?: boolean; spell?: boolean }
+export interface Terrain { kind: 'flat' | 'slope'; rise: number; axis: 'x' | 'y' }
 
 export interface MissileDef {
   base: number
@@ -24,19 +49,40 @@ export interface MissileDef {
   range: number
   speed: number
   spread: number
-  accNear: number
-  accFar: number
-  near: number
-  far: number
-  /** Arrows drop on the landing point. Bullets strike the first body on the path. */
+  /** Curved arrows and flatter bullets both collide with bodies throughout flight. */
   arc: boolean
   /** Full firing arc in degrees, centered on the regiment's facing. */
   cone: number
   /** Shots each soldier carries. */
   ammo: number
+  calibrationDistance: number
+  calibrationRadius: number
+  /** Penetration budget; one point is consumed by an ordinary infantry body. */
+  penetration: number
+  penetrationDamage: number
+  fireWhileMoving: boolean
 }
 
 export interface UnitDef {
+  category: 'infantry' | 'ranged' | 'cavalry' | 'chariot' | 'monstrousInfantry' | 'monster'
+  weapon: 'spear' | 'sword' | 'greatsword' | 'bow' | 'musket' | 'halberd' | 'claws'
+  /** A single swing shares its weapon damage between at most this many victims. */
+  splash: number
+  physicalSize: PhysicalSize
+  bodyHeight: number
+  penetrationResistance: number
+  chargeDefense: 'none' | 'large' | 'all'
+  chargeReflection: boolean
+  collisionAttack: CollisionAttackDef | null
+  attack: AttackProfile
+  wounds: WoundsDef | null
+  encourage: number
+  commander: boolean
+  causesFear: boolean
+  causesTerror: boolean
+  immunePsychology: boolean
+  unbreakable: boolean
+  resistances: Resistances
   type: UnitType
   name: string
   models: number
@@ -51,6 +97,7 @@ export interface UnitDef {
   armor: number
   weaponBase: number
   weaponAp: number
+  /** Start-to-start cooldown. Recovery can lengthen it if windup + recovery is greater. */
   meleeInterval: number
   reach: number
   speed: number
@@ -68,13 +115,14 @@ export interface UnitDef {
   impactPower: number
   antiLargeMa: number
   antiLargeWs: number
-  /** Melee attack added against spear, sword, and greatsword. */
+  /** Melee attack added against every small target, including ranged infantry. */
   antiInfantryMa: number
-  /** Weapon damage added against spear, sword, and greatsword. */
+  /** Weapon damage added against every small target. */
   antiInfantryWs: number
   shieldBlock: number
   canBrace: boolean
   leadership: number
+  /** Visible/weapon/projectile geometry. Movement uses the slimmer collision scale. */
   radius: number
   length: number
   spacing: number
@@ -82,8 +130,6 @@ export interface UnitDef {
   cleave: number
   large: boolean
   shape: 'circle' | 'capsule'
-  /** How many enemies can land a melee blow on this body at the same time. */
-  meleeSlots: number
   missile: MissileDef | null
 }
 
@@ -107,6 +153,8 @@ export interface Soldier {
   /** Index within a short rear rank that stands centered. -1 uses the file column. */
   centerIndex: number
   alive: boolean
+  /** Left the battlefield while routing; inactive, but not killed. */
+  escaped: boolean
   deathTime: number
   meleeCd: number
   reload: number
@@ -124,6 +172,29 @@ export interface Soldier {
   /** Velocity of the throw, in m/s. It dies away while the soldier is down. */
   knockVx: number
   knockVy: number
+  chargeLeft: number
+  chargeArmed: boolean
+  reactTo: number | null
+  reactTime: number
+  prevX: number
+  prevY: number
+  prevFacing: number
+  chargeContactAt: number
+  swing: { left: number; facing: number; targetId: number } | null
+  collisionCd: number
+  braceTime: number
+  wounded: boolean
+  /** Each chariot finishes its own straight run before turning for another pass. */
+  plowLeft: number
+  plowX: number
+  plowY: number
+  /** External velocity is independent of walking and dissipates through ground friction. */
+  pushVx: number
+  pushVy: number
+  blockedTime: number
+  avoidSide: number
+  bypass: { regId:number; side:number; direction:number; passing:boolean } | null
+  cartPath: { goalX:number; goalY:number; side:number; radius:number; arcLeft:number; straight:number } | null
 }
 
 export interface DamageEvent {
@@ -152,6 +223,10 @@ export interface Regiment {
   exertion: number
   fatigue: Fatigue
   restTime: number
+  run: boolean
+  fireAtWill: boolean
+  skirmish: boolean
+  skirmishing: boolean
   wantCharge: boolean
   anchorSpeed: number
   turnRate: number
@@ -174,6 +249,8 @@ export interface Regiment {
   rallyTime: number
   aliveCount: number
   initial: number
+  /** Maximum health of one model in this battle, including single-entity scale. */
+  modelHp: number
   leadership: number
   dealt: DamageEvent[]
   taken: DamageEvent[]
@@ -182,11 +259,27 @@ export interface Regiment {
   touchRear: boolean
   shot: boolean
   engaged: boolean
+  /** Briefly hold the melee frame after a cavalry impact knocks its target down. */
+  contactLock: number
+  /** Ignore old melee reactions while carrying out a changed attack target. */
+  retargeting: boolean
+  /** Reserves join a battle already reached by any member, even outside release range. */
+  attackCommitted: boolean
   nearEnemy: boolean
-  /** A melee blow has landed. While this is set the block turns toward the enemy. */
+  /** Legacy regiment-level damage marker; individual reaction controls facing. */
   meleeReact: boolean
-  /** Regiment that landed a rear melee blow. Faced until it is no longer behind. */
+  /** Last regiment to land a rear melee blow, retained for diagnostics. */
   rearFoe: number | null
+  moraleState: MoraleState
+  shattered: boolean
+  negativeTime: number
+  routeTime: number
+  routCount: number
+  /** Cooldown owned by this terror-causing regiment, never its victims. */
+  terrorCooldown: number
+  /** Sources that actually damaged this regiment during the current step. */
+  terrorHits: number[]
+  moraleFactors: Record<string, number>
 }
 
 export interface Projectile {
@@ -210,6 +303,12 @@ export interface Projectile {
   age: number
   duration: number
   apex: number
+  z: number
+  vz: number
+  gravity: number
+  sourceGround: number
+  penetrationLeft: number
+  hitIds: number[]
 }
 
 export interface Floater {
@@ -236,6 +335,8 @@ export interface PendingOrder {
 }
 
 export interface Battle {
+  /** Present only on a main-thread view; commands are executed by the worker. */
+  sendCommand?: (command:BattleCommand)=>void
   seed: number
   time: number
   rng: () => number
@@ -250,4 +351,5 @@ export interface Battle {
   widthOrder: Map<number, number[]>
   soldierById: Map<number, Soldier>
   aiEnabled: boolean
+  terrain: Terrain
 }

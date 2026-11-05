@@ -79,7 +79,7 @@ function decide(battle: Battle, reg: Regiment): AiIntent | null {
     return intent(reg, 'attack', foe.anchorX, foe.anchorY, facing, foe.id, `attack:${foe.id}`)
   }
 
-  if (isRangedInfantry(reg.type)) {
+  if (unitDef(reg.type).missile) {
     const missile = unitDef(reg.type).missile!
     const foe = nearest(reg, players)
     if (!foe) return null

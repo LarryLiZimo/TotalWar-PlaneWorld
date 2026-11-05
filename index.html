@@ -21,14 +21,34 @@
         <button type="button" data-speed="5">5×</button>
         <button id="ai" type="button">北军停止</button>
         <button id="restart" type="button">再战</button>
+        <button id="army-setup" type="button">部队配置</button>
+        <select id="scenario" aria-label="测试场景"></select>
+        <button id="single-step" type="button" title="暂停并推进一个模拟步">单步</button>
+        <button id="snapshot" type="button">导出现场</button>
+        <button id="gait" type="button" aria-label="当前跑步" title="当前跑步；点击切换为走路（R）" disabled>»</button>
+        <button id="fire-at-will" type="button" disabled>自由射击</button>
+        <button id="skirmish" type="button" disabled>自动后撤</button>
       </header>
       <aside id="side" class="panel">
         <section id="detail"></section>
-        <div id="roster"></div>
       </aside>
+      <nav id="roster" class="panel" aria-label="南军兵牌"></nav>
       <ul id="notices"></ul>
       <p id="help">左键选择，右键地面移动，右键拖线拉正面，右键敌军攻击。拖两侧圆点改宽度。P 暂停，按住 Alt 显示全部队形，按住空格显示体力。WASD 平移，滚轮缩放。</p>
       <div id="banner" hidden></div>
+      <dialog id="setup-dialog" class="panel">
+        <form method="dialog" id="setup-form">
+          <h1>选择部队</h1>
+          <div class="setup-fields">
+            <label>玩家部队<select id="player-army"></select></label>
+            <label>AI 部队<select id="enemy-army"></select></label>
+            <label>部队规模<select id="army-scale"></select></label>
+          </div>
+          <p class="muted" id="scale-summary"></p>
+          <div class="army-previews"><section id="player-preview"></section><section id="enemy-preview"></section></div>
+          <footer><button id="setup-cancel" type="button">返回战场</button><button id="start-battle" type="submit" class="on">开始战斗</button></footer>
+        </form>
+      </dialog>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -2,6 +2,7 @@ import { angDiff, clamp, forward, right } from './math'
 import type { Battle, Regiment, Soldier, UnitDef } from './types'
 import { MAP_HEIGHT, MAP_WIDTH } from './types'
 import { unitDef } from './units'
+import { MECHANICS } from './mechanics'
 
 export interface Vec2 {
   x: number
@@ -38,7 +39,7 @@ export function shapePoints(s: Pick<Soldier, 'x' | 'y' | 'facing'>, def: UnitDef
   ]
 }
 
-/** Positive when separated, negative when overlapping. */
+/** Weapon/visible-body gap, independent of the slimmer movement collider. */
 export function gapBetween(a: Soldier, aDef: UnitDef, b: Soldier, bDef: UnitDef): number {
   if (aDef.shape === 'circle' && bDef.shape === 'circle') {
     return Math.hypot(a.x - b.x, a.y - b.y) - aDef.radius - bDef.radius
@@ -55,11 +56,25 @@ export function gapBetween(a: Soldier, aDef: UnitDef, b: Soldier, bDef: UnitDef)
   return best
 }
 
-export function isBracing(reg: Regiment, def: UnitDef, towardX: number, towardY: number): boolean {
+export function isBracing(reg: Regiment, def: UnitDef, towardX: number, towardY: number, soldier?: Soldier): boolean {
   if (!def.canBrace || reg.routing) return false
-  if (reg.aliveCount <= reg.initial * 0.5) return false
-  if (reg.stationaryTime < 1.5) return false
-  return beforeFront(reg, def, towardX, towardY)
+  if (soldier) {
+    if (!soldier.alive || soldier.down > 0 || soldier.braceTime < MECHANICS.braceTime || soldier.speed > 0.25) return false
+    return beforeFront(reg,def,towardX,towardY) && Math.abs(angDiff(soldier.facing, Math.atan2(towardY-soldier.y,towardX-soldier.x))) <= Math.PI / 3
+  }
+  if (reg.stationaryTime < MECHANICS.braceTime) return false
+  const standing = reg.soldiers.filter(s => s.alive && s.down <= 0 && s.speed < 0.25).length
+  return standing >= reg.aliveCount * MECHANICS.braceStillFraction && beforeFront(reg, def, towardX, towardY)
+}
+
+export function chargeDefended(reg: Regiment, def: UnitDef, soldier: Soldier, attacker: UnitDef, x: number, y: number): boolean {
+  return (def.chargeDefense === 'all' || (def.chargeDefense === 'large' && attacker.large)) && isBracing(reg,def,x,y,soldier)
+}
+
+/** Local interpolation between one-rank and eight-rank support; coefficients are tunable. */
+export function bracingMassMultiplier(reg: Regiment): number {
+  const depth = Math.ceil(reg.aliveCount / Math.max(1, reg.files))
+  return 1 + 3 * clamp((depth - 1) / 7, 0, 1)
 }
 
 /**
@@ -380,31 +395,37 @@ export function fitOnMap(reg: Regiment, x: number, y: number, facing: number, fi
 }
 
 export function compactRanks(reg: Regiment): void {
-  const byFile = new Map<number, Soldier[]>()
-  const centered: Soldier[] = []
-  for (const soldier of reg.soldiers) {
-    if (!soldier.alive) continue
-    if (soldier.centerIndex >= 0) {
-      centered.push(soldier)
-      continue
+  const alive=reg.soldiers.filter(s=>s.alive)
+  if (!alive.length) return
+  const def=unitDef(reg.type)
+  reg.files=fileCount(def,reg.files,alive.length)
+  reg.destFiles=fileCount(def,reg.destFiles,alive.length)
+  const slots=formationSlots(reg,def,reg.files,alive.length)
+  const key=(s:{file:number;rank:number;centerIndex:number})=>`${s.rank}:${s.centerIndex<0?'f':'c'}:${s.centerIndex<0?s.file:s.centerIndex}`
+  const occupied=new Map(alive.map(s=>[key(s),s]))
+  const kept=new Set<Soldier>(),holes:typeof slots=[]
+  for (const slot of slots) {
+    const soldier=occupied.get(key(slot))
+    if (soldier && !kept.has(soldier)) kept.add(soldier)
+    else holes.push(slot)
+  }
+  // Fill from the front using the nearest remaining body. This propagates a
+  // vacancy through nearby ranks instead of sending a rear model through a
+  // stationary column. Quadratic matching avoids a cubic assignment each time
+  // one of 240 models dies; explicit formation changes keep exact assignment.
+  if(holes.length) {
+    const used=new Uint8Array(alive.length)
+    for(const slot of slots) {
+      let best=-1,cost=Infinity
+      for(let i=0;i<alive.length;i++) {
+        if(used[i]) continue
+        const d=(alive[i].x-slot.x)**2+(alive[i].y-slot.y)**2
+        if(d<cost) {best=i;cost=d}
+      }
+      const s=alive[best];used[best]=1
+      s.file=slot.file;s.rank=slot.rank;s.centerIndex=slot.centerIndex;s.idle=false
     }
-    const list = byFile.get(soldier.file)
-    if (list) list.push(soldier)
-    else byFile.set(soldier.file, [soldier])
   }
-  let deepest = 0
-  for (const list of byFile.values()) {
-    list.sort((a, b) => a.rank - b.rank)
-    list.forEach((soldier, rank) => {
-      soldier.rank = rank
-    })
-    deepest = Math.max(deepest, list.length)
-  }
-  centered.sort((a, b) => a.centerIndex - b.centerIndex)
-  centered.forEach((soldier, index) => {
-    soldier.centerIndex = index
-    soldier.rank = deepest
-  })
 }
 
 export function centroid(regs: Regiment[]): Vec2 {

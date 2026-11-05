@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-04T21:36:09.725Z",
+  "scenario": "demo",
+  "seed": 42,
+  "speed": 1,
+  "performance": "58 FPS · 帧 P95 24.9 ms\n模拟 6.8 / 10.6 ms · 绘制 3.3 / 4.1 ms"
+}

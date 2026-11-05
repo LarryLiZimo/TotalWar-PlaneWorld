@@ -1,0 +1,112 @@
+{
+  "label": "before",
+  "scenario": "demo",
+  "seed": 42,
+  "soldiers": 1974,
+  "steps": 600,
+  "meanMs": 25.395427666666667,
+  "p95Ms": 40.975500000000466,
+  "maxMs": 73.15139999999883,
+  "hotspots": [
+    {
+      "name": "bodyContact src/sim/physics.ts:37",
+      "ms": 3489
+    },
+    {
+      "name": "separate src/sim/battle.ts:1580",
+      "ms": 3163
+    },
+    {
+      "name": "(garbage collector) :0",
+      "ms": 1376
+    },
+    {
+      "name": "chargeAt :831",
+      "ms": 1002
+    },
+    {
+      "name": "nearestEnemy src/sim/battle.ts:1131",
+      "ms": 886
+    },
+    {
+      "name": "resolveMelee src/sim/battle.ts:1161",
+      "ms": 593
+    },
+    {
+      "name": "step src/sim/battle.ts:264",
+      "ms": 578
+    },
+    {
+      "name": "query :41",
+      "ms": 479
+    },
+    {
+      "name": "nearestEnemyDistance :1960",
+      "ms": 347
+    },
+    {
+      "name": "get src/sim/formation.ts:4",
+      "ms": 335
+    },
+    {
+      "name": "moveSoldiers :703",
+      "ms": 327
+    },
+    {
+      "name": "fillGrid src/sim/battle.ts:689",
+      "ms": 290
+    },
+    {
+      "name": "gapBetween src/sim/formation.ts:57",
+      "ms": 259
+    },
+    {
+      "name": "query src/sim/spatial.ts:41",
+      "ms": 204
+    },
+    {
+      "name": "updateMorale :1798",
+      "ms": 174
+    },
+    {
+      "name": "followSlot src/sim/battle.ts:926",
+      "ms": 168
+    },
+    {
+      "name": "get src/sim/physics.ts:6",
+      "ms": 102
+    },
+    {
+      "name": "attackLane src/sim/battle.ts:858",
+      "ms": 101
+    },
+    {
+      "name": "meleeScreened src/sim/battle.ts:1236",
+      "ms": 95
+    },
+    {
+      "name": "crowdOn :818",
+      "ms": 85
+    },
+    {
+      "name": "clear :20",
+      "ms": 76
+    },
+    {
+      "name": "forward :30",
+      "ms": 66
+    },
+    {
+      "name": "finishChargeFatigueBog src/sim/battle.ts:1744",
+      "ms": 64
+    },
+    {
+      "name": "buildLive src/sim/battle.ts:666",
+      "ms": 61
+    },
+    {
+      "name": "post node:inspector:115",
+      "ms": 57
+    }
+  ]
+}

@@ -1,0 +1,2478 @@
+{
+  "clientDate": "2026-11-04",
+  "scope": "Frozen working-tree source snapshot; production source files were not changed by this investigation.",
+  "limitations": [
+    "Headless simulation measurements are not browser FPS.",
+    "Phase counters and CPU sampling add overhead; uninstrumented baseline is reported separately.",
+    "Another agent was active; absolute timings are specific to this run and machine.",
+    "Canvas API counts use a mock context and do not measure GPU or rasterization time.",
+    "The optimization prototype was checked against one seed and setup for 40 simulated seconds only."
+  ],
+  "summary": {
+    "baselineCombatMs": 111.44912175000002,
+    "prototypeCombatMs": 97.12073324999994,
+    "reductionPercent": 12.856439131159036,
+    "stateIdentical": true,
+    "randomStateIdentical": true
+  },
+  "measurements": {
+    "date": "2026-11-05T01:05:50.445Z",
+    "node": "v22.15.1",
+    "seed": 20261104,
+    "instrumented": true,
+    "sourceHashes": {
+      "src/army-setup.ts": "05b8237c0f657a0365437dbcc51579cd85df685740b23dcbd942a0e0a2bbf722",
+      "src/battle-client.ts": "d03f025f349012eeab7e06ed493d782df4897bf70474df97979ddf587ed542ab",
+      "src/camera.ts": "e9be66df70bcbd3d564faf3b7c91a03025cce7a643b122561be89ad171af90d2",
+      "src/icons.ts": "f29696486bbb39f9771a81223806ef508907536ce47dbb44d86371fae7c1ac15",
+      "src/input.ts": "5b481221757872d260c42a67fbf2043fcaf1c7bd06d470fe433f30929c1b833d",
+      "src/main.ts": "6f97241e609e5f86250397c7b7e1f759c99d0495061ce4ba7edce9cdada55dcb",
+      "src/performance.ts": "f75f5ccc126d8bdb2efe870fbab6c3e288b0e556adf868f06ed7d1aa5febb379",
+      "src/render.ts": "42e6701c834a2331655cb5bb9e2eabc3b9347d64b344f58beab5c75752dab83a",
+      "src/sim/ai.ts": "a1f927a62033d84f169c2f453e35367461c9562b5f4259a0fd6fa2a334627a3b",
+      "src/sim/armies.ts": "8473e34dc80767937849b95f6b3ce02b135b8d377e1c74b0c2f32bc79ca657ea",
+      "src/sim/ballistics.ts": "8ead56258413cd4f608819996887ad4e2502e8f5530564105d45e8cde59f194b",
+      "src/sim/battle.ts": "776035c38b14dd067bf1c5ca0940a29316af445135f3eb49183effcb0d371243",
+      "src/sim/battle.worker.ts": "238dbe96da581853b2e7789ceb7a43c6b0fe75052c635cf21fae90993f6931ac",
+      "src/sim/combat.ts": "da8117e476390846f86dc9ff6908aa917f0bac74ddb6fa35d6f7a53f26489919",
+      "src/sim/commands.ts": "86cc8535c82b47bab99c81e5680f4ff0c10577aa310a5ce99c49baaeffc452fb",
+      "src/sim/diagnostics.ts": "ec77962f6833d330ab366fe0123ef050284d6423431f3fdd8a441fca594d6419",
+      "src/sim/formation.ts": "87eabeefb82efd6db4542d0414a047c45cd098eaa5f3859d1b75040bafde09c4",
+      "src/sim/index.ts": "7d5bc65193478a7356f3d56cd149984b07e3bd365d3f3ff8fcfdf26d428cf98e",
+      "src/sim/math.ts": "051c4c3ebc2a91a14567be69201aef47c1a10fe96158eb1432e27127411f8993",
+      "src/sim/mechanics.ts": "f263bab766917f3db8847ff42e0f6b7b62013aff7250ae14b5e019620d2b6ea3",
+      "src/sim/morale.ts": "b276c2c53a08c5afc756180edb6ff134eabe548b4d8ae65bbb11d483ca9cc30d",
+      "src/sim/orders.ts": "f66c0727dce3ac636ba199c63251135edfbee154dc1f720b94a3cd63ed6e27f0",
+      "src/sim/physics.ts": "e88272307f86aad89719691e8f83fe7868478fde27b04ff392a1107fcc3b3f04",
+      "src/sim/scenarios.ts": "7f66c5f7fb842a4151542622f0fb57888bb3b2d0b1d19c387bd507cbd16a09a7",
+      "src/sim/spatial.ts": "c6c07d12f2058a2718d13432644077ac8458e2252f28fb178a6da72bf8f114a8",
+      "src/sim/terrain.ts": "b874ea0060de4f72dfc1d5e4d05c24223331c088e37048620b002e3ef65c75b0",
+      "src/sim/transport.ts": "fc1d9e6ffcf1fb83e2a3216d50bb3100f7bd158faa57c524c7775fe1d7a9f2c4",
+      "src/sim/types.ts": "ce6bbbfccc9606c4b172fa29a3af9908502052cf3aaea97ed90bc2ae95176c3e",
+      "src/sim/units.ts": "bbd24f4653fdcfdc2c41c5d450bd29107108854c259445f6f863835c0923f0d6",
+      "src/sim/worker-protocol.ts": "85a0d584380461e5318090b8b61c2e5e87d7c914235bc1b531d2269c5735688b",
+      "src/styles.css": "d18f2acedd127c1447320a69ac20b80d682db2c5ea618baabe8b7aca0bb93c9a",
+      "src/unit-panel.ts": "97dcfd73aeae6071042a15ba5d9366420debaa7997f8fe00691ae479f589d036"
+    },
+    "runs": [
+      {
+        "config": {
+          "player": "classic",
+          "enemy": "classic",
+          "scale": 4
+        },
+        "models": 3184,
+        "bins": [
+          {
+            "from": 0,
+            "to": 4.99999999999999,
+            "steps": 100,
+            "meanMs": 16.838313,
+            "p95Ms": 21.96620000000007,
+            "maxMs": 65.62969999999996,
+            "alive": 3184,
+            "phasesMsPerStep": {
+              "timers": 0.23341000000001713,
+              "transients": 0.028840000000000147,
+              "ai": 0.09899599999998827,
+              "orders": 0.08241000000000895,
+              "regimentMovement": 0.07643600000000333,
+              "buildLive": 0.23235599999999068,
+              "soldierMovement": 9.09422099999997,
+              "grid": 0.2141650000000118,
+              "melee": 2.9360299999999917,
+              "collisionAttacks": 0.014966999999983273,
+              "shooting": 0.06149100000000999,
+              "projectiles": 0.010040999999987435,
+              "impact": 0.014818000000004758,
+              "separation": 1.5576910000000044,
+              "postMovement": 0.18689999999999146,
+              "chargeFatigue": 0.49564300000000455,
+              "morale": 1.423873999999996,
+              "compaction": 0.031192000000005465,
+              "counts": 0.026123999999999797,
+              "victory": 0.003965999999991254
+            },
+            "countsPerStep": {
+              "gridBuilds": 5,
+              "queries": 11103.32,
+              "cells": 154859.48,
+              "candidates": 397595.86,
+              "separationPasses": 1,
+              "chargeCalls": 937.2,
+              "chargeSlots": 112464
+            }
+          },
+          {
+            "from": 5,
+            "to": 10.000000000000007,
+            "steps": 100,
+            "meanMs": 19.46873499999997,
+            "p95Ms": 22.672900000000027,
+            "maxMs": 35.02759999999989,
+            "alive": 3184,
+            "phasesMsPerStep": {
+              "timers": 0.1188409999999658,
+              "transients": 0.02336400000001049,
+              "ai": 0.063704000000007,
+              "orders": 0.07253100000000813,
+              "regimentMovement": 0.033981999999996335,
+              "buildLive": 0.1555109999999877,
+              "soldierMovement": 10.896341000000012,
+              "grid": 0.11961099999998623,
+              "melee": 3.21729100000005,
+              "collisionAttacks": 0.007899999999990541,
+              "shooting": 0.7189389999999639,
+              "projectiles": 0.350944000000045,
+              "impact": 0.007986000000037165,
+              "separation": 1.678996999999972,
+              "postMovement": 0.1753910000000087,
+              "chargeFatigue": 0.4979749999999694,
+              "morale": 1.2888839999999981,
+              "compaction": 0.002710000000006403,
+              "counts": 0.02544799999997849,
+              "victory": 0.0018350000000100408
+            },
+            "countsPerStep": {
+              "gridBuilds": 5,
+              "queries": 11905.93,
+              "cells": 182489.66,
+              "candidates": 424798.16,
+              "chargeCalls": 1320,
+              "chargeSlots": 158400,
+              "separationPasses": 1
+            }
+          },
+          {
+            "from": 10,
+            "to": 15.000000000000078,
+            "steps": 100,
+            "meanMs": 20.55353399999998,
+            "p95Ms": 22.799799999999777,
+            "maxMs": 29.42619999999988,
+            "alive": 3184,
+            "phasesMsPerStep": {
+              "timers": 0.08222300000006726,
+              "transients": 0.022409999999918,
+              "ai": 0.05957000000003063,
+              "orders": 0.06864099999997961,
+              "regimentMovement": 0.03383699999998498,
+              "buildLive": 0.1536000000000422,
+              "soldierMovement": 11.036418999999977,
+              "grid": 0.15001099999997677,
+              "melee": 3.213766000000023,
+              "collisionAttacks": 0.007991000000065468,
+              "shooting": 2.037945999999965,
+              "projectiles": 0.17082299999990938,
+              "impact": 0.008344000000033703,
+              "separation": 1.5805480000000172,
+              "postMovement": 0.16733600000002297,
+              "chargeFatigue": 0.471860999999999,
+              "morale": 1.2619100000000072,
+              "compaction": 0.0033680000000549624,
+              "counts": 0.019319999999897846,
+              "victory": 0.001650000000045111
+            },
+            "countsPerStep": {
+              "gridBuilds": 5,
+              "queries": 11955.47,
+              "cells": 227393.76,
+              "candidates": 448848.56,
+              "chargeCalls": 1320,
+              "chargeSlots": 158400,
+              "separationPasses": 1
+            }
+          },
+          {
+            "from": 15,
+            "to": 20.00000000000015,
+            "steps": 100,
+            "meanMs": 40.22360600000012,
+            "p95Ms": 61.403299999999945,
+            "maxMs": 72.51260000000002,
+            "alive": 3184,
+            "phasesMsPerStep": {
+              "timers": 0.21289999999999054,
+              "transients": 0.06584700000006706,
+              "ai": 0.06655899999997927,
+              "orders": 0.09180200000004334,
+              "regimentMovement": 0.038259999999918366,
+              "buildLive": 0.20357199999998557,
+              "soldierMovement": 15.841898000000056,
+              "grid": 0.13895699999999123,
+              "melee": 10.566501999999947,
+              "collisionAttacks": 0.012083000000020548,
+              "shooting": 1.5648490000000492,
+              "projectiles": 0.09296200000007956,
+              "impact": 0.00952899999989313,
+              "separation": 7.286208000000006,
+              "postMovement": 0.20387800000002243,
+              "chargeFatigue": 2.235206000000053,
+              "morale": 1.5587860000000364,
+              "compaction": 0.0029029999999875145,
+              "counts": 0.02662399999993795,
+              "victory": 0.0016180000000349537
+            },
+            "countsPerStep": {
+              "gridBuilds": 7.55,
+              "queries": 22101.75,
+              "cells": 245451.49,
+              "candidates": 907230.98,
+              "chargeCalls": 1005.2,
+              "chargeSlots": 120624,
+              "separationPasses": 3.55
+            }
+          },
+          {
+            "from": 20,
+            "to": 25.00000000000022,
+            "steps": 100,
+            "meanMs": 53.73232800000005,
+            "p95Ms": 57.820299999999406,
+            "maxMs": 90.99499999999898,
+            "alive": 3148,
+            "phasesMsPerStep": {
+              "timers": 0.20895700000010037,
+              "transients": 0.028790999999891938,
+              "ai": 0.056518000000014584,
+              "orders": 0.09039800000000468,
+              "regimentMovement": 0.02558499999999185,
+              "buildLive": 0.14421000000003914,
+              "soldierMovement": 18.985116999999917,
+              "grid": 0.1353880000000936,
+              "melee": 16.577254000000067,
+              "collisionAttacks": 0.010917999999965105,
+              "shooting": 1.3732689999999457,
+              "projectiles": 0.23876000000000203,
+              "impact": 0.009332000000031258,
+              "separation": 11.309789000000038,
+              "postMovement": 0.1807359999998698,
+              "chargeFatigue": 2.850927000000047,
+              "morale": 1.430371999999952,
+              "compaction": 0.03888600000003862,
+              "counts": 0.031420999999954805,
+              "victory": 0.0027230000001145526
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 24435.36,
+              "cells": 259456.88,
+              "candidates": 1511408.71,
+              "chargeCalls": 845.57,
+              "chargeSlots": 101468.4,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 25,
+            "to": 30.00000000000029,
+            "steps": 100,
+            "meanMs": 54.04089799999998,
+            "p95Ms": 58.033800000001065,
+            "maxMs": 71.02219999999943,
+            "alive": 3094,
+            "phasesMsPerStep": {
+              "timers": 0.13825500000020838,
+              "transients": 0.022307999999939057,
+              "ai": 0.04003300000003947,
+              "orders": 0.0811760000000504,
+              "regimentMovement": 0.027719999999790162,
+              "buildLive": 0.13590399999997316,
+              "soldierMovement": 18.93326300000019,
+              "grid": 0.12966200000002573,
+              "melee": 16.503216999999932,
+              "collisionAttacks": 0.009190999999882479,
+              "shooting": 1.39231699999993,
+              "projectiles": 0.20377000000014958,
+              "impact": 0.00891299999981129,
+              "separation": 11.937617000000028,
+              "postMovement": 0.17666100000024015,
+              "chargeFatigue": 2.9031749999997554,
+              "morale": 1.336391000000076,
+              "compaction": 0.03811999999990803,
+              "counts": 0.01877300000014657,
+              "victory": 0.0016929999999774736
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 24257.79,
+              "cells": 256944.59,
+              "candidates": 1551337.48,
+              "chargeCalls": 804.13,
+              "chargeSlots": 96495.6,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 30,
+            "to": 35.00000000000015,
+            "steps": 100,
+            "meanMs": 64.764604,
+            "p95Ms": 78.43960000000152,
+            "maxMs": 115.33120000000054,
+            "alive": 3065,
+            "phasesMsPerStep": {
+              "timers": 0.17288699999975507,
+              "transients": 0.03327600000022358,
+              "ai": 0.0646579999999085,
+              "orders": 0.11213999999996303,
+              "regimentMovement": 0.047910999999949126,
+              "buildLive": 0.16439200000026177,
+              "soldierMovement": 22.60322299999978,
+              "grid": 0.14417500000010477,
+              "melee": 20.428053999999793,
+              "collisionAttacks": 0.011996000000435743,
+              "shooting": 1.7129129999995711,
+              "projectiles": 0.28128600000010917,
+              "impact": 0.011014999999933934,
+              "separation": 13.70344400000009,
+              "postMovement": 0.21136999999987893,
+              "chargeFatigue": 3.364667000000336,
+              "morale": 1.6248589999997785,
+              "compaction": 0.04191399999996065,
+              "counts": 0.025225000000136787,
+              "victory": 0.002259999999841966
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 24531.89,
+              "cells": 261129.15,
+              "candidates": 1574249.8,
+              "chargeCalls": 787.3,
+              "chargeSlots": 94476,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 35,
+            "to": 39.999999999999865,
+            "steps": 100,
+            "meanMs": 100.19467299999997,
+            "p95Ms": 147.6776000000027,
+            "maxMs": 231.04139999999825,
+            "alive": 3017,
+            "phasesMsPerStep": {
+              "timers": 0.23839300000006916,
+              "transients": 0.0611799999998766,
+              "ai": 0.11890399999996588,
+              "orders": 0.1628370000004361,
+              "regimentMovement": 0.10246699999945122,
+              "buildLive": 0.21162899999995716,
+              "soldierMovement": 34.15884599999983,
+              "grid": 0.2319980000002397,
+              "melee": 31.673188000000156,
+              "collisionAttacks": 0.017338000000090687,
+              "shooting": 2.7903130000001695,
+              "projectiles": 0.6065119999995658,
+              "impact": 0.020185000000128638,
+              "separation": 21.774355000000067,
+              "postMovement": 0.34131600000015166,
+              "chargeFatigue": 5.118169000000052,
+              "morale": 2.4251989999999206,
+              "compaction": 0.08000799999950686,
+              "counts": 0.055438000000358444,
+              "victory": 0.002710000000151922
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 24605.64,
+              "cells": 261869.02,
+              "candidates": 1571977.95,
+              "chargeCalls": 750.83,
+              "chargeSlots": 90099.6,
+              "separationPasses": 4
+            }
+          }
+        ],
+        "cpu": {
+          "sampledMs": 27339.203,
+          "self": [
+            {
+              "name": "query src/sim/spatial.ts:42",
+              "ms": 6362.003,
+              "percent": 23.27062350720319
+            },
+            {
+              "name": "nearestEnemy src/sim/battle.ts:1191",
+              "ms": 3052.058,
+              "percent": 11.163668523914176
+            },
+            {
+              "name": "separate src/sim/battle.ts:1638",
+              "ms": 2405.598,
+              "percent": 8.799078744175535
+            },
+            {
+              "name": "gapBetween :57",
+              "ms": 2121.828,
+              "percent": 7.761118712933951
+            },
+            {
+              "name": "meleeScreened src/sim/battle.ts:1294",
+              "ms": 2014.113,
+              "percent": 7.367124052592169
+            },
+            {
+              "name": "resolveMelee src/sim/battle.ts:1219",
+              "ms": 1823.75,
+              "percent": 6.670823578873166
+            },
+            {
+              "name": "chargeAt src/sim/battle.ts:851",
+              "ms": 1656.004,
+              "percent": 6.057250461909954
+            },
+            {
+              "name": "(garbage collector) :0",
+              "ms": 928.863,
+              "percent": 3.3975496652188433
+            },
+            {
+              "name": "step src/sim/battle.ts:272",
+              "ms": 818.937,
+              "percent": 2.9954677171825383
+            },
+            {
+              "name": "moveSoldiers src/sim/battle.ts:721",
+              "ms": 614.667,
+              "percent": 2.2482988988376875
+            },
+            {
+              "name": "attackLane src/sim/battle.ts:880",
+              "ms": 580.639,
+              "percent": 2.1238329442156743
+            },
+            {
+              "name": "collisionExtent :15",
+              "ms": 431.896,
+              "percent": 1.5797680715125455
+            },
+            {
+              "name": "get src/sim/investigation-probe.ts:3",
+              "ms": 386.222,
+              "percent": 1.4127039475144905
+            },
+            {
+              "name": "nearestEnemyDistance :2050",
+              "ms": 313.256,
+              "percent": 1.1458124803418739
+            },
+            {
+              "name": "fillGrid src/sim/battle.ts:706",
+              "ms": 261.373,
+              "percent": 0.9560373797290287
+            },
+            {
+              "name": "updateMorale :1887",
+              "ms": 227.344,
+              "percent": 0.8315677673559101
+            },
+            {
+              "name": "crowdOn :838",
+              "ms": 224.719,
+              "percent": 0.8219661707036595
+            },
+            {
+              "name": "get src/sim/mechanics.ts:3",
+              "ms": 220.147,
+              "percent": 0.8052429326487681
+            },
+            {
+              "name": "followSlot :948",
+              "ms": 197.615,
+              "percent": 0.7228264847369544
+            },
+            {
+              "name": "clearShot src/sim/battle.ts:1475",
+              "ms": 153.306,
+              "percent": 0.5607551909980697
+            },
+            {
+              "name": "inAttackZone src/sim/battle.ts:1209",
+              "ms": 145.152,
+              "percent": 0.53092988848285
+            },
+            {
+              "name": "get src/sim/physics.ts:4",
+              "ms": 117.908,
+              "percent": 0.43127811736135835
+            },
+            {
+              "name": "contactPush :21",
+              "ms": 103.975,
+              "percent": 0.3803146712067649
+            },
+            {
+              "name": "finishChargeFatigueBog src/sim/battle.ts:1833",
+              "ms": 101.945,
+              "percent": 0.3728894364623577
+            },
+            {
+              "name": "collisionRadius :12",
+              "ms": 98.134,
+              "percent": 0.35894974699884263
+            },
+            {
+              "name": "bodyContact :54",
+              "ms": 95.41,
+              "percent": 0.3489860329871357
+            },
+            {
+              "name": "clear :21",
+              "ms": 80.608,
+              "percent": 0.2948440011217591
+            },
+            {
+              "name": "get src/sim/formation.ts:5",
+              "ms": 76.571,
+              "percent": 0.2800776599083741
+            },
+            {
+              "name": "swapIfCrossing src/sim/battle.ts:1767",
+              "ms": 75.414,
+              "percent": 0.27584564187917254
+            },
+            {
+              "name": "buildLive src/sim/battle.ts:683",
+              "ms": 72.945,
+              "percent": 0.26681465439939855
+            },
+            {
+              "name": "flyProjectiles src/sim/battle.ts:1496",
+              "ms": 72.519,
+              "percent": 0.26525645242840473
+            },
+            {
+              "name": "post node:inspector:115",
+              "ms": 61.75,
+              "percent": 0.2258661307719907
+            },
+            {
+              "name": "gapBetween src/sim/formation.ts:57",
+              "ms": 61.256,
+              "percent": 0.22405920172581476
+            },
+            {
+              "name": "get src/sim/formation.ts:4",
+              "ms": 56.913,
+              "percent": 0.2081735886741102
+            },
+            {
+              "name": "moveSpeedOf src/sim/battle.ts:488",
+              "ms": 55.432,
+              "percent": 0.20275645928668806
+            }
+          ],
+          "inclusive": [
+            {
+              "name": "(root) :0",
+              "ms": 27339.203,
+              "percent": 100
+            },
+            {
+              "name": "(anonymous) scratch/perf-investigation/run.mjs:0",
+              "ms": 26410.314,
+              "percent": 96.60235523325241
+            },
+            {
+              "name": "step src/sim/battle.ts:272",
+              "ms": 26314.419,
+              "percent": 96.25159519097905
+            },
+            {
+              "name": "moveSoldiers src/sim/battle.ts:721",
+              "ms": 9061.683,
+              "percent": 33.14538101202145
+            },
+            {
+              "name": "resolveMelee src/sim/battle.ts:1219",
+              "ms": 7932.431,
+              "percent": 29.01485826049867
+            },
+            {
+              "name": "query src/sim/spatial.ts:42",
+              "ms": 6745.015,
+              "percent": 24.671586073668642
+            },
+            {
+              "name": "nearestEnemy src/sim/battle.ts:1191",
+              "ms": 6131.259,
+              "percent": 22.426619386088174
+            },
+            {
+              "name": "separate src/sim/battle.ts:1638",
+              "ms": 5302.881,
+              "percent": 19.396618840717487
+            },
+            {
+              "name": "meleeScreened src/sim/battle.ts:1294",
+              "ms": 3321.694,
+              "percent": 12.149929901028937
+            },
+            {
+              "name": "chargeAt src/sim/battle.ts:851",
+              "ms": 2957.603,
+              "percent": 10.818175643232907
+            },
+            {
+              "name": "gapBetween :57",
+              "ms": 2121.828,
+              "percent": 7.761118712933951
+            },
+            {
+              "name": "finishChargeFatigueBog src/sim/battle.ts:1833",
+              "ms": 1328.73,
+              "percent": 4.860163626569509
+            },
+            {
+              "name": "(garbage collector) :0",
+              "ms": 928.863,
+              "percent": 3.3975496652188433
+            },
+            {
+              "name": "resolveShooting src/sim/battle.ts:1354",
+              "ms": 709.709,
+              "percent": 2.595938879417955
+            },
+            {
+              "name": "attackLane src/sim/battle.ts:880",
+              "ms": 697.307,
+              "percent": 2.5505754502060647
+            },
+            {
+              "name": "updateMorale :1887",
+              "ms": 591.581,
+              "percent": 2.1638560568133607
+            },
+            {
+              "name": "crowdOn :838",
+              "ms": 562.18,
+              "percent": 2.056314516557048
+            },
+            {
+              "name": "collisionExtent :15",
+              "ms": 558.603,
+              "percent": 2.043230740852248
+            },
+            {
+              "name": "clearShot src/sim/battle.ts:1475",
+              "ms": 524.786,
+              "percent": 1.9195365717135207
+            },
+            {
+              "name": "linePressed :1820",
+              "ms": 467.887,
+              "percent": 1.711414191554889
+            },
+            {
+              "name": "get src/sim/investigation-probe.ts:3",
+              "ms": 386.222,
+              "percent": 1.4127039475144905
+            },
+            {
+              "name": "followSlot :948",
+              "ms": 353.014,
+              "percent": 1.2912373487990854
+            },
+            {
+              "name": "fillGrid src/sim/battle.ts:706",
+              "ms": 327.939,
+              "percent": 1.1995192398256818
+            },
+            {
+              "name": "nearestEnemyDistance :2050",
+              "ms": 319.667,
+              "percent": 1.1692623226799992
+            },
+            {
+              "name": "get src/sim/mechanics.ts:3",
+              "ms": 220.147,
+              "percent": 0.8052429326487681
+            },
+            {
+              "name": "inAttackZone src/sim/battle.ts:1209",
+              "ms": 184.166,
+              "percent": 0.6736333901174808
+            },
+            {
+              "name": "bodyContact :54",
+              "ms": 164.094,
+              "percent": 0.6002150099254905
+            },
+            {
+              "name": "flyProjectiles src/sim/battle.ts:1496",
+              "ms": 126.96,
+              "percent": 0.4643880803694241
+            },
+            {
+              "name": "get src/sim/physics.ts:4",
+              "ms": 117.908,
+              "percent": 0.43127811736135835
+            },
+            {
+              "name": "contactPush :21",
+              "ms": 117.06,
+              "percent": 0.4281763444237932
+            },
+            {
+              "name": "collisionRadius :12",
+              "ms": 111.971,
+              "percent": 0.40956204904729665
+            },
+            {
+              "name": "swapIfCrossing src/sim/battle.ts:1767",
+              "ms": 110.698,
+              "percent": 0.4049057318898433
+            },
+            {
+              "name": "moveSpeedOf src/sim/battle.ts:488",
+              "ms": 82.439,
+              "percent": 0.301541343396148
+            },
+            {
+              "name": "steer src/sim/battle.ts:1118",
+              "ms": 81.811,
+              "percent": 0.2992442757018191
+            },
+            {
+              "name": "clear :21",
+              "ms": 80.608,
+              "percent": 0.2948440011217591
+            }
+          ]
+        },
+        "steps": 800,
+        "meanMs": 46.227086375000006,
+        "p95Ms": 106.14390000000276,
+        "maxMs": 231.04139999999825
+      },
+      {
+        "config": {
+          "player": "classic",
+          "enemy": "classic",
+          "scale": 8
+        },
+        "models": 6368,
+        "bins": [
+          {
+            "from": 0,
+            "to": 4.99999999999999,
+            "steps": 100,
+            "meanMs": 60.43665600000051,
+            "p95Ms": 75.94210000000021,
+            "maxMs": 85.21549999999843,
+            "alive": 6368,
+            "phasesMsPerStep": {
+              "timers": 0.2875430000000051,
+              "transients": 0.09426399999996647,
+              "ai": 0.08995599999943807,
+              "orders": 0.19866300000045156,
+              "regimentMovement": 0.0560140000001411,
+              "buildLive": 0.4250979999998526,
+              "soldierMovement": 31.043747000000003,
+              "grid": 0.4626309999998921,
+              "melee": 9.224250999999859,
+              "collisionAttacks": 0.03038600000014412,
+              "shooting": 0.08489600000015343,
+              "projectiles": 0.011653000000005704,
+              "impact": 0.021604999999908614,
+              "separation": 12.898191000000152,
+              "postMovement": 0.48079100000002656,
+              "chargeFatigue": 1.433311999999787,
+              "morale": 3.493092000000033,
+              "compaction": 0.028012000000089757,
+              "counts": 0.06733800000016345,
+              "victory": 0.0026129999996192055
+            },
+            "countsPerStep": {
+              "gridBuilds": 7.43,
+              "queries": 37688.63,
+              "cells": 341046.59,
+              "candidates": 998226.18,
+              "separationPasses": 3.43,
+              "chargeCalls": 1874.4,
+              "chargeSlots": 449856
+            }
+          },
+          {
+            "from": 5,
+            "to": 10.000000000000007,
+            "steps": 100,
+            "meanMs": 65.67569299999995,
+            "p95Ms": 71.92930000000342,
+            "maxMs": 84.85580000000482,
+            "alive": 6368,
+            "phasesMsPerStep": {
+              "timers": 0.26303099999982804,
+              "transients": 0.07198700000015379,
+              "ai": 0.0841599999999744,
+              "orders": 0.19331200000015086,
+              "regimentMovement": 0.03975400000002992,
+              "buildLive": 0.36392899999969813,
+              "soldierMovement": 35.74406200000012,
+              "grid": 0.44434599999993224,
+              "melee": 8.15674600000013,
+              "collisionAttacks": 0.02699899999970512,
+              "shooting": 1.4608399999999528,
+              "projectiles": 0.6178910000003817,
+              "impact": 0.023456000000078348,
+              "separation": 13.300652999999583,
+              "postMovement": 0.4288749999999709,
+              "chargeFatigue": 1.2153250000001572,
+              "morale": 3.191586000000025,
+              "compaction": 0.003046999999860418,
+              "counts": 0.040752000000720726,
+              "victory": 0.0024629999995522665
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 42885,
+              "cells": 393933.48,
+              "candidates": 1097474.74,
+              "chargeCalls": 2640,
+              "chargeSlots": 633600,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 10,
+            "to": 15.000000000000078,
+            "steps": 100,
+            "meanMs": 75.44050100000015,
+            "p95Ms": 101.4664000000048,
+            "maxMs": 114.25800000000163,
+            "alive": 6368,
+            "phasesMsPerStep": {
+              "timers": 0.30651999999980034,
+              "transients": 0.07776199999985693,
+              "ai": 0.08428300000028685,
+              "orders": 0.2071369999997114,
+              "regimentMovement": 0.03702900000018417,
+              "buildLive": 0.3783619999997609,
+              "soldierMovement": 39.0382560000004,
+              "grid": 0.5111359999998968,
+              "melee": 8.47127899999985,
+              "collisionAttacks": 0.027853999999861115,
+              "shooting": 6.034068000000116,
+              "projectiles": 0.6217869999999676,
+              "impact": 0.02772499999970023,
+              "separation": 14.284491000000708,
+              "postMovement": 0.49076899999978196,
+              "chargeFatigue": 1.3058879999996862,
+              "morale": 3.479720000000161,
+              "compaction": 0.003649000000077649,
+              "counts": 0.04725300000005518,
+              "victory": 0.0027569999997649574
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 43011.87,
+              "cells": 499105.56,
+              "candidates": 1200781.44,
+              "chargeCalls": 2640,
+              "chargeSlots": 633600,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 15,
+            "to": 20.00000000000015,
+            "steps": 100,
+            "meanMs": 92.45796300000038,
+            "p95Ms": 111.59229999998934,
+            "maxMs": 128.9759000000049,
+            "alive": 6368,
+            "phasesMsPerStep": {
+              "timers": 0.24775000000008732,
+              "transients": 0.06398399999976391,
+              "ai": 0.05706200000073295,
+              "orders": 0.17183999999964727,
+              "regimentMovement": 0.022370000000228173,
+              "buildLive": 0.3323729999997886,
+              "soldierMovement": 42.221028000000516,
+              "grid": 0.4048150000002352,
+              "melee": 21.38088399999906,
+              "collisionAttacks": 0.029172000000835398,
+              "shooting": 4.053898999999074,
+              "projectiles": 0.11078500000017812,
+              "impact": 0.02411999999982072,
+              "separation": 15.32073300000091,
+              "postMovement": 0.4046819999994477,
+              "chargeFatigue": 4.545325999999331,
+              "morale": 3.0231310000004306,
+              "compaction": 0.002751999999891268,
+              "counts": 0.03679700000022421,
+              "victory": 0.0022989999993296806
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 47154.01,
+              "cells": 505665.1,
+              "candidates": 2044934.18,
+              "chargeCalls": 2009.2,
+              "chargeSlots": 482208,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 20,
+            "to": 25.00000000000022,
+            "steps": 100,
+            "meanMs": 125.76172100000069,
+            "p95Ms": 133.21770000000834,
+            "maxMs": 135.1067999999941,
+            "alive": 6297,
+            "phasesMsPerStep": {
+              "timers": 0.2603350000003411,
+              "transients": 0.06299399999988964,
+              "ai": 0.05411300000007031,
+              "orders": 0.16312199999927543,
+              "regimentMovement": 0.021282000000210247,
+              "buildLive": 0.327390000000305,
+              "soldierMovement": 50.38040800000061,
+              "grid": 0.40894999999916765,
+              "melee": 35.301851999999634,
+              "collisionAttacks": 0.02286400000026333,
+              "shooting": 4.024207000000897,
+              "projectiles": 0.5965459999989252,
+              "impact": 0.021566000001766953,
+              "separation": 24.367094999998955,
+              "postMovement": 0.4518750000001455,
+              "chargeFatigue": 6.129936000000016,
+              "morale": 3.021366999999591,
+              "compaction": 0.10372600000133389,
+              "counts": 0.03782099999851198,
+              "victory": 0.0022230000000854487
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 48960.24,
+              "cells": 532444.98,
+              "candidates": 3328748.46,
+              "chargeCalls": 1754.43,
+              "chargeSlots": 421063.2,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 25,
+            "to": 30.00000000000029,
+            "steps": 100,
+            "meanMs": 125.64369199999928,
+            "p95Ms": 134.17570000000705,
+            "maxMs": 147.56750000000466,
+            "alive": 6235,
+            "phasesMsPerStep": {
+              "timers": 0.2520779999998922,
+              "transients": 0.06116300000037882,
+              "ai": 0.0424309999991965,
+              "orders": 0.15836100000029546,
+              "regimentMovement": 0.020470000000641447,
+              "buildLive": 0.32791999999972177,
+              "soldierMovement": 50.746992000000176,
+              "grid": 0.3578449999995064,
+              "melee": 34.54688600000023,
+              "collisionAttacks": 0.021019000000233063,
+              "shooting": 4.053162000000011,
+              "projectiles": 0.5269870000002266,
+              "impact": 0.02032199999986915,
+              "separation": 24.810319999999482,
+              "postMovement": 0.417739000000729,
+              "chargeFatigue": 6.260621999999712,
+              "morale": 2.884462999999814,
+              "compaction": 0.09257199999978184,
+              "counts": 0.03792300000059186,
+              "victory": 0.002010999999765772
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 48289.57,
+              "cells": 522798.85,
+              "candidates": 3367826.98,
+              "chargeCalls": 1712.38,
+              "chargeSlots": 410971.2,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 30,
+            "to": 35.00000000000015,
+            "steps": 100,
+            "meanMs": 129.9533490000006,
+            "p95Ms": 146.46850000000268,
+            "maxMs": 195.3252999999968,
+            "alive": 6165,
+            "phasesMsPerStep": {
+              "timers": 0.2794800000010582,
+              "transients": 0.06765900000027614,
+              "ai": 0.046225999998714545,
+              "orders": 0.18223900000026333,
+              "regimentMovement": 0.02239600000102655,
+              "buildLive": 0.34036799999899814,
+              "soldierMovement": 51.9967750000002,
+              "grid": 0.38846500000028755,
+              "melee": 35.883405999999816,
+              "collisionAttacks": 0.02273499999922933,
+              "shooting": 4.389520999999804,
+              "projectiles": 0.525348000001104,
+              "impact": 0.024061999999830733,
+              "separation": 25.493775000000024,
+              "postMovement": 0.4624490000003425,
+              "chargeFatigue": 6.595180999998702,
+              "morale": 3.0805160000000615,
+              "compaction": 0.10558599999974831,
+              "counts": 0.042693000001308976,
+              "victory": 0.0022439999994821845
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 48126.6,
+              "cells": 521286.23,
+              "candidates": 3337395.76,
+              "chargeCalls": 1681.63,
+              "chargeSlots": 403591.2,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 35,
+            "to": 39.999999999999865,
+            "steps": 100,
+            "meanMs": 127.73171699999978,
+            "p95Ms": 137.1828999999998,
+            "maxMs": 144.72539999999572,
+            "alive": 6072,
+            "phasesMsPerStep": {
+              "timers": 0.26698999999978695,
+              "transients": 0.06049100000047474,
+              "ai": 0.04660799999866867,
+              "orders": 0.16865900000018882,
+              "regimentMovement": 0.022557000001252162,
+              "buildLive": 0.3333970000002591,
+              "soldierMovement": 49.30115299999874,
+              "grid": 0.3699510000011651,
+              "melee": 37.47101099999883,
+              "collisionAttacks": 0.02128900000010617,
+              "shooting": 4.3121850000009,
+              "projectiles": 0.7138999999997031,
+              "impact": 0.021819999999424907,
+              "separation": 24.715102999999946,
+              "postMovement": 0.43783500000063214,
+              "chargeFatigue": 6.271909999999917,
+              "morale": 3.015662000000593,
+              "compaction": 0.13686199999952806,
+              "counts": 0.04025999999998021,
+              "victory": 0.002022999999462627
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 48933.89,
+              "cells": 532649.02,
+              "candidates": 3435603.89,
+              "chargeCalls": 1644.46,
+              "chargeSlots": 394670.4,
+              "separationPasses": 4
+            }
+          }
+        ],
+        "cpu": {
+          "sampledMs": 50963.653,
+          "self": [
+            {
+              "name": "query src/sim/spatial.ts:42",
+              "ms": 11181.907,
+              "percent": 21.94094485338404
+            },
+            {
+              "name": "chargeAt src/sim/battle.ts:851",
+              "ms": 5561.495,
+              "percent": 10.91266946660986
+            },
+            {
+              "name": "nearestEnemy src/sim/battle.ts:1191",
+              "ms": 5519.754,
+              "percent": 10.830765997092085
+            },
+            {
+              "name": "separate src/sim/battle.ts:1638",
+              "ms": 4156.202,
+              "percent": 8.155227805196775
+            },
+            {
+              "name": "gapBetween :57",
+              "ms": 3635.765,
+              "percent": 7.134035309439063
+            },
+            {
+              "name": "resolveMelee :1219",
+              "ms": 3317.198,
+              "percent": 6.508948642280411
+            },
+            {
+              "name": "meleeScreened src/sim/battle.ts:1294",
+              "ms": 3313.116,
+              "percent": 6.500939012358474
+            },
+            {
+              "name": "(garbage collector) :0",
+              "ms": 1737.369,
+              "percent": 3.4090354551311304
+            },
+            {
+              "name": "attackLane src/sim/battle.ts:880",
+              "ms": 1714.287,
+              "percent": 3.363744353255054
+            },
+            {
+              "name": "step src/sim/battle.ts:272",
+              "ms": 1126.959,
+              "percent": 2.2112994922086924
+            },
+            {
+              "name": "moveSoldiers src/sim/battle.ts:721",
+              "ms": 1007.124,
+              "percent": 1.9761613242284652
+            },
+            {
+              "name": "get src/sim/investigation-probe.ts:3",
+              "ms": 706.549,
+              "percent": 1.3863782488276497
+            },
+            {
+              "name": "collisionExtent :15",
+              "ms": 631.554,
+              "percent": 1.2392243546591921
+            },
+            {
+              "name": "nearestEnemyDistance :2050",
+              "ms": 567.158,
+              "percent": 1.112867635292941
+            },
+            {
+              "name": "fillGrid src/sim/battle.ts:706",
+              "ms": 559.709,
+              "percent": 1.098251336104184
+            },
+            {
+              "name": "clearShot src/sim/battle.ts:1475",
+              "ms": 459.087,
+              "percent": 0.9008125850005297
+            },
+            {
+              "name": "updateMorale :1887",
+              "ms": 456.547,
+              "percent": 0.8958286408550815
+            },
+            {
+              "name": "crowdOn :838",
+              "ms": 395.133,
+              "percent": 0.775323150402896
+            },
+            {
+              "name": "get src/sim/mechanics.ts:3",
+              "ms": 338.698,
+              "percent": 0.6645873677854294
+            },
+            {
+              "name": "followSlot :948",
+              "ms": 331.702,
+              "percent": 0.6508599373753683
+            },
+            {
+              "name": "contactPush :21",
+              "ms": 193.963,
+              "percent": 0.3805908497179353
+            },
+            {
+              "name": "bodyContact :54",
+              "ms": 186.738,
+              "percent": 0.3664140794616901
+            },
+            {
+              "name": "get src/sim/physics.ts:4",
+              "ms": 178.076,
+              "percent": 0.34941765261607133
+            },
+            {
+              "name": "finishChargeFatigueBog :1833",
+              "ms": 177.898,
+              "percent": 0.34906838408934304
+            },
+            {
+              "name": "inAttackZone src/sim/battle.ts:1209",
+              "ms": 158.536,
+              "percent": 0.31107660198534043
+            },
+            {
+              "name": "collisionRadius :12",
+              "ms": 155.662,
+              "percent": 0.3054372888065932
+            },
+            {
+              "name": "fillGrid :706",
+              "ms": 149.121,
+              "percent": 0.29260265154069703
+            },
+            {
+              "name": "get src/sim/formation.ts:5",
+              "ms": 146.5,
+              "percent": 0.2874597705937602
+            },
+            {
+              "name": "(anonymous) src/sim/battle.ts:886",
+              "ms": 141.956,
+              "percent": 0.2785436122485176
+            },
+            {
+              "name": "buildLive src/sim/battle.ts:683",
+              "ms": 139.076,
+              "percent": 0.2728925259733638
+            },
+            {
+              "name": "clear :21",
+              "ms": 135.48,
+              "percent": 0.2658365168603593
+            },
+            {
+              "name": "flyProjectiles src/sim/battle.ts:1496",
+              "ms": 126.053,
+              "percent": 0.24733902022290277
+            },
+            {
+              "name": "resolveShooting src/sim/battle.ts:1354",
+              "ms": 115.506,
+              "percent": 0.22664387892288648
+            },
+            {
+              "name": "swapIfCrossing src/sim/battle.ts:1767",
+              "ms": 114.557,
+              "percent": 0.22478176750791393
+            },
+            {
+              "name": "get src/sim/formation.ts:4",
+              "ms": 94.332,
+              "percent": 0.18509662170409957
+            }
+          ],
+          "inclusive": [
+            {
+              "name": "(root) :0",
+              "ms": 50963.653,
+              "percent": 100
+            },
+            {
+              "name": "(anonymous) scratch/perf-investigation/run.mjs:0",
+              "ms": 49226.284,
+              "percent": 96.59096454486887
+            },
+            {
+              "name": "step src/sim/battle.ts:272",
+              "ms": 49148.099,
+              "percent": 96.43755128777758
+            },
+            {
+              "name": "moveSoldiers src/sim/battle.ts:721",
+              "ms": 19393.119,
+              "percent": 38.05284326851531
+            },
+            {
+              "name": "resolveMelee :1219",
+              "ms": 13585.384,
+              "percent": 26.6570059253798
+            },
+            {
+              "name": "query src/sim/spatial.ts:42",
+              "ms": 11883.662,
+              "percent": 23.317916398182838
+            },
+            {
+              "name": "nearestEnemy src/sim/battle.ts:1191",
+              "ms": 10821.261,
+              "percent": 21.233291498943373
+            },
+            {
+              "name": "separate src/sim/battle.ts:1638",
+              "ms": 9103.034,
+              "percent": 17.861816145714673
+            },
+            {
+              "name": "chargeAt src/sim/battle.ts:851",
+              "ms": 8700.778,
+              "percent": 17.072516367694444
+            },
+            {
+              "name": "meleeScreened src/sim/battle.ts:1294",
+              "ms": 5287.9,
+              "percent": 10.375826081383924
+            },
+            {
+              "name": "gapBetween :57",
+              "ms": 3635.765,
+              "percent": 7.134035309439063
+            },
+            {
+              "name": "finishChargeFatigueBog :1833",
+              "ms": 2378.023,
+              "percent": 4.666115672673621
+            },
+            {
+              "name": "attackLane src/sim/battle.ts:880",
+              "ms": 2025.683,
+              "percent": 3.974760208025119
+            },
+            {
+              "name": "(garbage collector) :0",
+              "ms": 1737.369,
+              "percent": 3.4090354551311304
+            },
+            {
+              "name": "resolveShooting src/sim/battle.ts:1354",
+              "ms": 1629.062,
+              "percent": 3.196517329713394
+            },
+            {
+              "name": "clearShot src/sim/battle.ts:1475",
+              "ms": 1297.71,
+              "percent": 2.5463441562950755
+            },
+            {
+              "name": "updateMorale :1887",
+              "ms": 1076.317,
+              "percent": 2.1119306341717694
+            },
+            {
+              "name": "crowdOn :838",
+              "ms": 1037.283,
+              "percent": 2.0353387933160914
+            },
+            {
+              "name": "linePressed :1820",
+              "ms": 914.869,
+              "percent": 1.7951401560637736
+            },
+            {
+              "name": "collisionExtent :15",
+              "ms": 840.286,
+              "percent": 1.6487946811819003
+            },
+            {
+              "name": "get src/sim/investigation-probe.ts:3",
+              "ms": 706.549,
+              "percent": 1.3863782488276497
+            },
+            {
+              "name": "followSlot :948",
+              "ms": 680.936,
+              "percent": 1.3361208624507352
+            },
+            {
+              "name": "fillGrid src/sim/battle.ts:706",
+              "ms": 658.023,
+              "percent": 1.2911613694567774
+            },
+            {
+              "name": "nearestEnemyDistance :2050",
+              "ms": 583.381,
+              "percent": 1.144700125793573
+            },
+            {
+              "name": "get src/sim/mechanics.ts:3",
+              "ms": 338.698,
+              "percent": 0.6645873677854294
+            },
+            {
+              "name": "bodyContact :54",
+              "ms": 290.059,
+              "percent": 0.5691487617655665
+            },
+            {
+              "name": "contactPush :21",
+              "ms": 208.277,
+              "percent": 0.40867753337854335
+            },
+            {
+              "name": "inAttackZone src/sim/battle.ts:1209",
+              "ms": 196.129,
+              "percent": 0.38484093752070714
+            },
+            {
+              "name": "flyProjectiles src/sim/battle.ts:1496",
+              "ms": 189.758,
+              "percent": 0.37233987131966384
+            },
+            {
+              "name": "fillGrid :706",
+              "ms": 186.287,
+              "percent": 0.36552913504846285
+            },
+            {
+              "name": "swapIfCrossing src/sim/battle.ts:1767",
+              "ms": 185.968,
+              "percent": 0.3649031987561802
+            },
+            {
+              "name": "get src/sim/physics.ts:4",
+              "ms": 178.076,
+              "percent": 0.34941765261607133
+            },
+            {
+              "name": "collisionRadius :12",
+              "ms": 165.297,
+              "percent": 0.3243429194528108
+            },
+            {
+              "name": "moveSpeedOf :488",
+              "ms": 149.899,
+              "percent": 0.29412922970808236
+            },
+            {
+              "name": "get src/sim/formation.ts:5",
+              "ms": 146.5,
+              "percent": 0.2874597705937602
+            }
+          ]
+        },
+        "steps": 800,
+        "meanMs": 100.38766150000016,
+        "p95Ms": 134.11510000001,
+        "maxMs": 195.3252999999968
+      },
+      {
+        "config": {
+          "player": "classic",
+          "enemy": "advance",
+          "scale": 8
+        },
+        "models": 5680,
+        "bins": [
+          {
+            "from": 0,
+            "to": 4.99999999999999,
+            "steps": 100,
+            "meanMs": 51.81938900000023,
+            "p95Ms": 65.8804999999993,
+            "maxMs": 79.8006000000023,
+            "alive": 5680,
+            "phasesMsPerStep": {
+              "timers": 0.33902500000040164,
+              "transients": 0.06486699999964912,
+              "ai": 0.2897840000003635,
+              "orders": 0.17372500000041327,
+              "regimentMovement": 0.2013799999996263,
+              "buildLive": 0.37152800000054415,
+              "soldierMovement": 24.265429999999615,
+              "grid": 0.425396999999648,
+              "melee": 7.3963720000009925,
+              "collisionAttacks": 0.039794999998848654,
+              "shooting": 0.0672640000001411,
+              "projectiles": 0.003894000000145752,
+              "impact": 0.11994500000073458,
+              "separation": 13.544773999999451,
+              "postMovement": 0.37345099999947706,
+              "chargeFatigue": 1.2211160000004748,
+              "morale": 2.854857999999658,
+              "compaction": 0.02158800000033807,
+              "counts": 0.04003900000025169,
+              "victory": 0.0022109999993699604
+            },
+            "countsPerStep": {
+              "gridBuilds": 7.43,
+              "queries": 33519.34,
+              "cells": 324477.05,
+              "candidates": 965952.89,
+              "separationPasses": 3.43,
+              "chargeCalls": 1772.16,
+              "chargeSlots": 400508.16
+            }
+          },
+          {
+            "from": 5,
+            "to": 10.000000000000007,
+            "steps": 100,
+            "meanMs": 67.70086599999806,
+            "p95Ms": 87.1195000000007,
+            "maxMs": 92.71329999998852,
+            "alive": 5680,
+            "phasesMsPerStep": {
+              "timers": 0.27150999999867054,
+              "transients": 0.07272500000050058,
+              "ai": 0.26430799999958254,
+              "orders": 0.20756400000071154,
+              "regimentMovement": 0.04357199999940349,
+              "buildLive": 0.36444299999959184,
+              "soldierMovement": 33.38086399999927,
+              "grid": 0.4777040000009583,
+              "melee": 7.815693999999493,
+              "collisionAttacks": 0.0313379999998142,
+              "shooting": 1.5040680000009887,
+              "projectiles": 0.6456299999996554,
+              "impact": 0.4613069999999425,
+              "separation": 17.155061999999454,
+              "postMovement": 0.476484000000055,
+              "chargeFatigue": 1.315738999999885,
+              "morale": 3.161329999999725,
+              "compaction": 0.0038100000005215407,
+              "counts": 0.04270099999994272,
+              "victory": 0.0027180000001681037
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 38321.94,
+              "cells": 382589.46,
+              "candidates": 1075319.37,
+              "chargeCalls": 2496,
+              "chargeSlots": 564096,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 10,
+            "to": 15.000000000000078,
+            "steps": 100,
+            "meanMs": 64.3009800000007,
+            "p95Ms": 68.99069999999483,
+            "maxMs": 72.69349999999395,
+            "alive": 5680,
+            "phasesMsPerStep": {
+              "timers": 0.2110299999997369,
+              "transients": 0.05551500000030501,
+              "ai": 0.2421560000005411,
+              "orders": 0.16705800000025192,
+              "regimentMovement": 0.17774399999907473,
+              "buildLive": 0.3283440000005066,
+              "soldierMovement": 30.20333200000052,
+              "grid": 0.39913999999902444,
+              "melee": 7.071283000000694,
+              "collisionAttacks": 0.02383500000083586,
+              "shooting": 5.486511999998183,
+              "projectiles": 0.5134120000016992,
+              "impact": 0.35191399999981515,
+              "separation": 14.82324699999881,
+              "postMovement": 0.3663200000004144,
+              "chargeFatigue": 1.1583119999995688,
+              "morale": 2.6786710000006133,
+              "compaction": 0.0029979999986244365,
+              "counts": 0.034549000000406525,
+              "victory": 0.0038120000009075738
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 38392.92,
+              "cells": 486410.86,
+              "candidates": 1184512.49,
+              "chargeCalls": 2496,
+              "chargeSlots": 564096,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 15,
+            "to": 20.00000000000015,
+            "steps": 100,
+            "meanMs": 92.37164800000347,
+            "p95Ms": 109.60469999999623,
+            "maxMs": 172.42410000000382,
+            "alive": 5679,
+            "phasesMsPerStep": {
+              "timers": 0.2950900000016554,
+              "transients": 0.0666070000003674,
+              "ai": 0.33193500000081255,
+              "orders": 0.20899699999950827,
+              "regimentMovement": 0.09776899999968008,
+              "buildLive": 0.3408759999994072,
+              "soldierMovement": 36.93136099999974,
+              "grid": 0.38759099999937463,
+              "melee": 22.546308000000426,
+              "collisionAttacks": 0.02579200000152923,
+              "shooting": 3.9169909999982337,
+              "projectiles": 0.12565900000161492,
+              "impact": 0.3476410000002943,
+              "separation": 18.61565299999842,
+              "postMovement": 0.3763190000029863,
+              "chargeFatigue": 4.800396999998193,
+              "morale": 2.869350999998278,
+              "compaction": 0.02731800000037765,
+              "counts": 0.05582900000037625,
+              "victory": 0.0019920000014826654
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 42837.24,
+              "cells": 495926.59,
+              "candidates": 2028982.22,
+              "chargeCalls": 1785.02,
+              "chargeSlots": 397161.12,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 20,
+            "to": 25.00000000000022,
+            "steps": 100,
+            "meanMs": 119.72280899999954,
+            "p95Ms": 130.034799999994,
+            "maxMs": 163.7503999999899,
+            "alive": 5597,
+            "phasesMsPerStep": {
+              "timers": 0.2562099999989732,
+              "transients": 0.05976500000077067,
+              "ai": 0.3057639999999083,
+              "orders": 0.18384700000198792,
+              "regimentMovement": 0.1287049999993178,
+              "buildLive": 0.31963999999978115,
+              "soldierMovement": 43.69702399999922,
+              "grid": 0.3634879999991972,
+              "melee": 34.06195000000065,
+              "collisionAttacks": 0.022712999998766463,
+              "shooting": 3.83287000000244,
+              "projectiles": 0.5499899999980699,
+              "impact": 0.17716500000096858,
+              "separation": 26.04576900000073,
+              "postMovement": 0.4122439999994822,
+              "chargeFatigue": 6.336014000000141,
+              "morale": 2.7504079999995885,
+              "compaction": 0.1586550000004354,
+              "counts": 0.05703000000154134,
+              "victory": 0.001748999997798819
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 44665.86,
+              "cells": 521468.31,
+              "candidates": 3107493.12,
+              "chargeCalls": 1498.56,
+              "chargeSlots": 332997.12,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 25,
+            "to": 30.00000000000029,
+            "steps": 100,
+            "meanMs": 120.66090599999995,
+            "p95Ms": 131.64689999999246,
+            "maxMs": 145.7496000000101,
+            "alive": 5500,
+            "phasesMsPerStep": {
+              "timers": 0.26085099999821976,
+              "transients": 0.056626999999571125,
+              "ai": 0.27286300000094343,
+              "orders": 0.17785199999954784,
+              "regimentMovement": 0.060276999998895915,
+              "buildLive": 0.32431500000151575,
+              "soldierMovement": 44.116881999999165,
+              "grid": 0.3637119999999413,
+              "melee": 34.58895100000111,
+              "collisionAttacks": 0.023992999998736195,
+              "shooting": 3.773915000000561,
+              "projectiles": 0.4249380000017118,
+              "impact": 0.22200999999884516,
+              "separation": 26.199271000000007,
+              "postMovement": 0.40524100000126057,
+              "chargeFatigue": 6.470562999998801,
+              "morale": 2.7323400000011318,
+              "compaction": 0.13750299999839627,
+              "counts": 0.04482300000090618,
+              "victory": 0.0019369999985792675
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 44605.67,
+              "cells": 520713.89,
+              "candidates": 3097451.48,
+              "chargeCalls": 1471.93,
+              "chargeSlots": 327658.4,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 30,
+            "to": 35.00000000000015,
+            "steps": 100,
+            "meanMs": 120.60026599999867,
+            "p95Ms": 133.70019999999204,
+            "maxMs": 375.5688000000082,
+            "alive": 5416,
+            "phasesMsPerStep": {
+              "timers": 0.32063200000004144,
+              "transients": 0.06813400000042748,
+              "ai": 0.29899999999965077,
+              "orders": 0.2046760000003269,
+              "regimentMovement": 2.7813770000007936,
+              "buildLive": 0.32970799999806333,
+              "soldierMovement": 46.19479100000142,
+              "grid": 0.354802999998501,
+              "melee": 31.517324999999254,
+              "collisionAttacks": 0.021201000001747163,
+              "shooting": 3.778635999999533,
+              "projectiles": 0.15415399999939836,
+              "impact": 0.17914400000096065,
+              "separation": 25.457770999997738,
+              "postMovement": 0.44836200000194365,
+              "chargeFatigue": 5.426052999999666,
+              "morale": 2.8412240000008024,
+              "compaction": 0.15711099999956787,
+              "counts": 0.061780000002181625,
+              "victory": 0.0018989999979385176
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 43454.8,
+              "cells": 509434.48,
+              "candidates": 2920675.16,
+              "chargeCalls": 1679.12,
+              "chargeSlots": 378827.52,
+              "separationPasses": 4
+            }
+          },
+          {
+            "from": 35,
+            "to": 39.999999999999865,
+            "steps": 100,
+            "meanMs": 104.22887700000021,
+            "p95Ms": 112.289300000004,
+            "maxMs": 117.62309999999707,
+            "alive": 5368,
+            "phasesMsPerStep": {
+              "timers": 0.26238200000021605,
+              "transients": 0.056578999999328514,
+              "ai": 0.2515660000013304,
+              "orders": 0.18601199999888196,
+              "regimentMovement": 0.04244700000010198,
+              "buildLive": 0.31597100000130013,
+              "soldierMovement": 45.108028999998936,
+              "grid": 0.35204699999972944,
+              "melee": 24.391036999998907,
+              "collisionAttacks": 0.019706000001169743,
+              "shooting": 3.8712279999992463,
+              "projectiles": 0.48987900000123774,
+              "impact": 0.22334999999875435,
+              "separation": 21.661622000002826,
+              "postMovement": 0.45146799999667564,
+              "chargeFatigue": 3.655445000002801,
+              "morale": 2.7549849999978324,
+              "compaction": 0.07448700000008103,
+              "counts": 0.05691300000064075,
+              "victory": 0.001868000000831671
+            },
+            "countsPerStep": {
+              "gridBuilds": 8,
+              "queries": 42257.58,
+              "cells": 500990.09,
+              "candidates": 2428225.45,
+              "chargeCalls": 2004.09,
+              "chargeSlots": 461610.56,
+              "separationPasses": 4
+            }
+          }
+        ],
+        "cpu": {
+          "sampledMs": 46564.789,
+          "self": [
+            {
+              "name": "query src/sim/spatial.ts:42",
+              "ms": 10101.041,
+              "percent": 21.69244447773617
+            },
+            {
+              "name": "nearestEnemy src/sim/battle.ts:1191",
+              "ms": 5120.752,
+              "percent": 10.997047576012854
+            },
+            {
+              "name": "chargeAt src/sim/battle.ts:851",
+              "ms": 4819.371,
+              "percent": 10.349818185582244
+            },
+            {
+              "name": "separate src/sim/battle.ts:1638",
+              "ms": 4261.626,
+              "percent": 9.152035457521347
+            },
+            {
+              "name": "resolveMelee src/sim/battle.ts:1219",
+              "ms": 3046.61,
+              "percent": 6.54273339453981
+            },
+            {
+              "name": "gapBetween :57",
+              "ms": 3019.164,
+              "percent": 6.483791862559498
+            },
+            {
+              "name": "meleeScreened src/sim/battle.ts:1294",
+              "ms": 2768.234,
+              "percent": 5.94490828681732
+            },
+            {
+              "name": "(garbage collector) :0",
+              "ms": 1598.692,
+              "percent": 3.4332637048994252
+            },
+            {
+              "name": "attackLane src/sim/battle.ts:880",
+              "ms": 1354.578,
+              "percent": 2.909017798835081
+            },
+            {
+              "name": "step src/sim/battle.ts:272",
+              "ms": 1201.554,
+              "percent": 2.580391806349643
+            },
+            {
+              "name": "moveSoldiers src/sim/battle.ts:721",
+              "ms": 930.107,
+              "percent": 1.9974470409390237
+            },
+            {
+              "name": "collisionExtent :15",
+              "ms": 796.196,
+              "percent": 1.7098670843327561
+            },
+            {
+              "name": "get src/sim/investigation-probe.ts:3",
+              "ms": 657.118,
+              "percent": 1.4111907604692464
+            },
+            {
+              "name": "fillGrid src/sim/battle.ts:706",
+              "ms": 622.317,
+              "percent": 1.3364540318221994
+            },
+            {
+              "name": "nearestEnemyDistance :2050",
+              "ms": 490.135,
+              "percent": 1.052587181271239
+            },
+            {
+              "name": "clearShot src/sim/battle.ts:1475",
+              "ms": 437.233,
+              "percent": 0.9389777327241835
+            },
+            {
+              "name": "updateMorale :1887",
+              "ms": 433.586,
+              "percent": 0.9311456345265519
+            },
+            {
+              "name": "crowdOn :838",
+              "ms": 347.577,
+              "percent": 0.7464373992975679
+            },
+            {
+              "name": "get src/sim/mechanics.ts:3",
+              "ms": 336.843,
+              "percent": 0.7233856466095014
+            },
+            {
+              "name": "followSlot src/sim/battle.ts:948",
+              "ms": 304.22,
+              "percent": 0.6533262719176071
+            },
+            {
+              "name": "cheapestAssignment src/sim/formation.ts:232",
+              "ms": 273.915,
+              "percent": 0.5882449075416191
+            },
+            {
+              "name": "get src/sim/physics.ts:4",
+              "ms": 202.46,
+              "percent": 0.43479204855840753
+            },
+            {
+              "name": "inAttackZone src/sim/battle.ts:1209",
+              "ms": 177.296,
+              "percent": 0.380751215258379
+            },
+            {
+              "name": "contactPush :21",
+              "ms": 151.665,
+              "percent": 0.32570747824069385
+            },
+            {
+              "name": "clear :21",
+              "ms": 140.688,
+              "percent": 0.3021338720121764
+            },
+            {
+              "name": "bodyContact src/sim/physics.ts:54",
+              "ms": 139.45,
+              "percent": 0.2994752107649409
+            },
+            {
+              "name": "finishChargeFatigueBog src/sim/battle.ts:1833",
+              "ms": 137.563,
+              "percent": 0.2954227925310689
+            },
+            {
+              "name": "buildLive src/sim/battle.ts:683",
+              "ms": 133.548,
+              "percent": 0.286800397613742
+            },
+            {
+              "name": "get src/sim/formation.ts:5",
+              "ms": 130.157,
+              "percent": 0.27951807104720267
+            },
+            {
+              "name": "(anonymous) src/sim/battle.ts:886",
+              "ms": 118.504,
+              "percent": 0.254492724105332
+            },
+            {
+              "name": "collisionRadius :12",
+              "ms": 114.567,
+              "percent": 0.24603783773185356
+            },
+            {
+              "name": "resolveShooting src/sim/battle.ts:1354",
+              "ms": 110.609,
+              "percent": 0.23753785290426205
+            },
+            {
+              "name": "steer src/sim/battle.ts:1118",
+              "ms": 92.798,
+              "percent": 0.19928792118010027
+            },
+            {
+              "name": "forward :30",
+              "ms": 88.943,
+              "percent": 0.19100913353220605
+            },
+            {
+              "name": "flyProjectiles src/sim/battle.ts:1496",
+              "ms": 84.1,
+              "percent": 0.1806085709955649
+            }
+          ],
+          "inclusive": [
+            {
+              "name": "(root) :0",
+              "ms": 46564.789,
+              "percent": 100
+            },
+            {
+              "name": "(anonymous) scratch/perf-investigation/run.mjs:0",
+              "ms": 44962.816,
+              "percent": 96.55969019853177
+            },
+            {
+              "name": "step src/sim/battle.ts:272",
+              "ms": 44902.509,
+              "percent": 96.43017817604628
+            },
+            {
+              "name": "moveSoldiers src/sim/battle.ts:721",
+              "ms": 17083.662,
+              "percent": 36.68794032332027
+            },
+            {
+              "name": "resolveMelee src/sim/battle.ts:1219",
+              "ms": 11745.683,
+              "percent": 25.2243878953258
+            },
+            {
+              "name": "query src/sim/spatial.ts:42",
+              "ms": 10754.893,
+              "percent": 23.096621354818122
+            },
+            {
+              "name": "nearestEnemy src/sim/battle.ts:1191",
+              "ms": 9861.789,
+              "percent": 21.178639937571713
+            },
+            {
+              "name": "separate src/sim/battle.ts:1638",
+              "ms": 9132.643,
+              "percent": 19.6127657745856
+            },
+            {
+              "name": "chargeAt src/sim/battle.ts:851",
+              "ms": 7317.802,
+              "percent": 15.715312271682365
+            },
+            {
+              "name": "meleeScreened src/sim/battle.ts:1294",
+              "ms": 4592.94,
+              "percent": 9.863547325426515
+            },
+            {
+              "name": "gapBetween :57",
+              "ms": 3019.164,
+              "percent": 6.483791862559498
+            },
+            {
+              "name": "finishChargeFatigueBog src/sim/battle.ts:1833",
+              "ms": 2050.982,
+              "percent": 4.4045770292226605
+            },
+            {
+              "name": "(garbage collector) :0",
+              "ms": 1598.692,
+              "percent": 3.4332637048994252
+            },
+            {
+              "name": "attackLane src/sim/battle.ts:880",
+              "ms": 1594.933,
+              "percent": 3.4251910816131907
+            },
+            {
+              "name": "resolveShooting src/sim/battle.ts:1354",
+              "ms": 1466.65,
+              "percent": 3.1496975107092187
+            },
+            {
+              "name": "clearShot src/sim/battle.ts:1475",
+              "ms": 1211.108,
+              "percent": 2.6009094554256436
+            },
+            {
+              "name": "collisionExtent :15",
+              "ms": 1005.385,
+              "percent": 2.159109966116243
+            },
+            {
+              "name": "updateMorale :1887",
+              "ms": 986.896,
+              "percent": 2.11940399858786
+            },
+            {
+              "name": "crowdOn :838",
+              "ms": 861.341,
+              "percent": 1.8497689316277155
+            },
+            {
+              "name": "linePressed :1820",
+              "ms": 766.255,
+              "percent": 1.6455674264947275
+            },
+            {
+              "name": "fillGrid src/sim/battle.ts:706",
+              "ms": 763.005,
+              "percent": 1.6385879038343758
+            },
+            {
+              "name": "get src/sim/investigation-probe.ts:3",
+              "ms": 657.118,
+              "percent": 1.4111907604692464
+            },
+            {
+              "name": "followSlot src/sim/battle.ts:948",
+              "ms": 562.141,
+              "percent": 1.2072233377885595
+            },
+            {
+              "name": "nearestEnemyDistance :2050",
+              "ms": 507.554,
+              "percent": 1.0899952751852908
+            },
+            {
+              "name": "get src/sim/mechanics.ts:3",
+              "ms": 336.843,
+              "percent": 0.7233856466095014
+            },
+            {
+              "name": "moveRegiments src/sim/battle.ts:554",
+              "ms": 291.216,
+              "percent": 0.6253995910944641
+            },
+            {
+              "name": "march src/sim/battle.ts:614",
+              "ms": 282.118,
+              "percent": 0.605861222736347
+            },
+            {
+              "name": "assignFormation src/sim/formation.ts:213",
+              "ms": 281.038,
+              "percent": 0.6035418736676762
+            },
+            {
+              "name": "cheapestAssignment src/sim/formation.ts:232",
+              "ms": 273.915,
+              "percent": 0.5882449075416191
+            },
+            {
+              "name": "reformMoving src/sim/formation.ts:310",
+              "ms": 266.78,
+              "percent": 0.5729221708703545
+            },
+            {
+              "name": "inAttackZone src/sim/battle.ts:1209",
+              "ms": 222.847,
+              "percent": 0.47857405732043584
+            },
+            {
+              "name": "bodyContact src/sim/physics.ts:54",
+              "ms": 220.025,
+              "percent": 0.4725136841058165
+            },
+            {
+              "name": "get src/sim/physics.ts:4",
+              "ms": 202.46,
+              "percent": 0.43479204855840753
+            },
+            {
+              "name": "contactPush :21",
+              "ms": 162.829,
+              "percent": 0.34968267546536075
+            },
+            {
+              "name": "steer src/sim/battle.ts:1118",
+              "ms": 155.403,
+              "percent": 0.3337350030728154
+            }
+          ]
+        },
+        "steps": 800,
+        "meanMs": 92.6757176250001,
+        "p95Ms": 125.64100000000326,
+        "maxMs": 375.5688000000082
+      }
+    ]
+  },
+  "ablation": {
+    "date": "2026-11-05T01:09:12.371Z",
+    "seed": 20261104,
+    "runs": [
+      {
+        "mode": "baseline",
+        "bins": [
+          {
+            "from": 0,
+            "to": 5,
+            "meanMs": 38.21194799999997,
+            "p95Ms": 47.522899999999936,
+            "maxMs": 56.858000000000175
+          },
+          {
+            "from": 5,
+            "to": 10,
+            "meanMs": 48.041192,
+            "p95Ms": 54.64929999999913,
+            "maxMs": 86.88780000000042
+          },
+          {
+            "from": 10,
+            "to": 15,
+            "meanMs": 49.63439599999989,
+            "p95Ms": 54.79149999999936,
+            "maxMs": 68.72309999999925
+          },
+          {
+            "from": 15,
+            "to": 20,
+            "meanMs": 88.3287610000001,
+            "p95Ms": 144.67489999999816,
+            "maxMs": 321.7084999999988
+          },
+          {
+            "from": 20,
+            "to": 25,
+            "meanMs": 112.03207399999988,
+            "p95Ms": 123.85209999999643,
+            "maxMs": 156.61419999999998
+          },
+          {
+            "from": 25,
+            "to": 30,
+            "meanMs": 111.8106660000002,
+            "p95Ms": 124.0167999999976,
+            "maxMs": 138.28510000000097
+          },
+          {
+            "from": 30,
+            "to": 35,
+            "meanMs": 110.36591600000007,
+            "p95Ms": 116.52709999999934,
+            "maxMs": 121.53030000000581
+          },
+          {
+            "from": 35,
+            "to": 40,
+            "meanMs": 111.58783099999994,
+            "p95Ms": 123.75289999999222,
+            "maxMs": 199.06510000000708
+          }
+        ],
+        "stateHashes": [
+          "02cf11d677c9a19c1e871b35335e648ae3b3dbe38c387f708dfb9954e8478233",
+          "42ac3551fc29ca56ede63941ebee13bfdf4e6b9dae9fe2bfd12ce59a5534da6e",
+          "3ae08e4d9eb6747d8e2ff14471f0c427baf5f821f7509118d03936c972645430",
+          "df22d3cda0c650735780b6f75c969bcf188313e79ac8bb068e3afcabfa2c82d6",
+          "ad89fc5bddcceb52b5b2498eccc747d221f654a4bbd9f7b72de41b92c1d2d7cc",
+          "2d1967b51c0570de3aff31280b62da5aa5e7df00cb781c17227364205a08b0a0",
+          "df16bad4b720f96674e500e24042e25f554db0b555a7ce33b3f1cf541a25440d",
+          "b54026bef218e180e72fd9d28f439030095065dae3c90a3cd0fdecc1df35de90"
+        ],
+        "nextRandomValues": [
+          0.4009327609091997,
+          0.3598689630161971,
+          0.03425610042177141,
+          0.021992519963532686,
+          0.1366691254079342,
+          0.1180480772163719,
+          0.061202293029055,
+          0.07025127788074315,
+          0.35707940231077373,
+          0.617902266792953,
+          0.8862801508512348,
+          0.9132207233924419,
+          0.9013684892561287,
+          0.49725067522376776,
+          0.955477197188884,
+          0.887927801348269,
+          0.7411791437771171,
+          0.4211988030001521,
+          0.6757297846488655,
+          0.25892351078800857,
+          0.31178270326927304,
+          0.12754746177233756,
+          0.16038494976237416,
+          0.6125129158608615,
+          0.445220670895651,
+          0.38255835976451635,
+          0.08190039196051657,
+          0.1790102468803525,
+          0.041860674042254686,
+          0.9819359553512186,
+          0.4593367660418153,
+          0.6048798540141433
+        ],
+        "errors": [],
+        "wallMs": 67762.5839,
+        "cpuMs": 71719
+      },
+      {
+        "mode": "skip-unused-melee-target",
+        "bins": [
+          {
+            "from": 0,
+            "to": 5,
+            "meanMs": 38.616084999999146,
+            "p95Ms": 48.90810000000056,
+            "maxMs": 58.147200000006706
+          },
+          {
+            "from": 5,
+            "to": 10,
+            "meanMs": 49.188537999999824,
+            "p95Ms": 54.4485999999888,
+            "maxMs": 57.83059999998659
+          },
+          {
+            "from": 10,
+            "to": 15,
+            "meanMs": 49.321842000000615,
+            "p95Ms": 56.558399999994435,
+            "maxMs": 63.43489999999292
+          },
+          {
+            "from": 15,
+            "to": 20,
+            "meanMs": 70.70768799999976,
+            "p95Ms": 88.068299999999,
+            "maxMs": 98.50729999999749
+          },
+          {
+            "from": 20,
+            "to": 25,
+            "meanMs": 98.24932000000015,
+            "p95Ms": 106.57589999999618,
+            "maxMs": 129.023199999996
+          },
+          {
+            "from": 25,
+            "to": 30,
+            "meanMs": 98.88284099999976,
+            "p95Ms": 104.53699999999662,
+            "maxMs": 112.10629999999946
+          },
+          {
+            "from": 30,
+            "to": 35,
+            "meanMs": 96.21883900000016,
+            "p95Ms": 100.04559999999765,
+            "maxMs": 105.81450000000768
+          },
+          {
+            "from": 35,
+            "to": 40,
+            "meanMs": 95.1319329999997,
+            "p95Ms": 100.4493999999977,
+            "maxMs": 109.02030000000377
+          }
+        ],
+        "stateHashes": [
+          "02cf11d677c9a19c1e871b35335e648ae3b3dbe38c387f708dfb9954e8478233",
+          "42ac3551fc29ca56ede63941ebee13bfdf4e6b9dae9fe2bfd12ce59a5534da6e",
+          "3ae08e4d9eb6747d8e2ff14471f0c427baf5f821f7509118d03936c972645430",
+          "df22d3cda0c650735780b6f75c969bcf188313e79ac8bb068e3afcabfa2c82d6",
+          "ad89fc5bddcceb52b5b2498eccc747d221f654a4bbd9f7b72de41b92c1d2d7cc",
+          "2d1967b51c0570de3aff31280b62da5aa5e7df00cb781c17227364205a08b0a0",
+          "df16bad4b720f96674e500e24042e25f554db0b555a7ce33b3f1cf541a25440d",
+          "b54026bef218e180e72fd9d28f439030095065dae3c90a3cd0fdecc1df35de90"
+        ],
+        "nextRandomValues": [
+          0.4009327609091997,
+          0.3598689630161971,
+          0.03425610042177141,
+          0.021992519963532686,
+          0.1366691254079342,
+          0.1180480772163719,
+          0.061202293029055,
+          0.07025127788074315,
+          0.35707940231077373,
+          0.617902266792953,
+          0.8862801508512348,
+          0.9132207233924419,
+          0.9013684892561287,
+          0.49725067522376776,
+          0.955477197188884,
+          0.887927801348269,
+          0.7411791437771171,
+          0.4211988030001521,
+          0.6757297846488655,
+          0.25892351078800857,
+          0.31178270326927304,
+          0.12754746177233756,
+          0.16038494976237416,
+          0.6125129158608615,
+          0.445220670895651,
+          0.38255835976451635,
+          0.08190039196051657,
+          0.1790102468803525,
+          0.041860674042254686,
+          0.9819359553512186,
+          0.4593367660418153,
+          0.6048798540141433
+        ],
+        "errors": [],
+        "wallMs": 60321.6069,
+        "cpuMs": 62578
+      }
+    ],
+    "stateIdentical": true,
+    "randomStateIdentical": true
+  },
+  "renderAudit": {
+    "note": "Canvas API calls counted with a mock context. This is not a browser timing or FPS measurement.",
+    "cssWidth": 1600,
+    "cssHeight": 900,
+    "runs": [
+      {
+        "dpr": 1,
+        "zoom": 3.4434782608695653,
+        "spriteCacheActive": true,
+        "drawCalls": {
+          "clearRect": 1,
+          "fillRect": 108,
+          "save": 31,
+          "beginPath": 52,
+          "rect": 1,
+          "clip": 1,
+          "moveTo": 51,
+          "lineTo": 51,
+          "stroke": 51,
+          "restore": 31,
+          "strokeRect": 1,
+          "fillText": 32,
+          "drawImage": 6368
+        },
+        "atlasGenerationCalls": {
+          "clearRect": 10,
+          "save": 20,
+          "translate": 10,
+          "rotate": 10,
+          "fillRect": 20,
+          "beginPath": 22,
+          "arc": 12,
+          "fill": 12,
+          "stroke": 22,
+          "moveTo": 18,
+          "lineTo": 20,
+          "restore": 20,
+          "ellipse": 2
+        },
+        "totalDrawCalls": 6779
+      },
+      {
+        "dpr": 1.25,
+        "zoom": 4.304347826086956,
+        "spriteCacheActive": false,
+        "drawCalls": {
+          "clearRect": 1,
+          "fillRect": 12844,
+          "save": 12767,
+          "beginPath": 15668,
+          "rect": 1,
+          "clip": 1,
+          "moveTo": 11971,
+          "lineTo": 13411,
+          "stroke": 15667,
+          "restore": 12767,
+          "strokeRect": 1,
+          "fillText": 32,
+          "translate": 6368,
+          "rotate": 6368,
+          "arc": 7184,
+          "fill": 9248,
+          "ellipse": 2880
+        },
+        "atlasGenerationCalls": {},
+        "totalDrawCalls": 127179
+      },
+      {
+        "dpr": 1.5,
+        "zoom": 5.165217391304348,
+        "spriteCacheActive": false,
+        "drawCalls": {
+          "clearRect": 1,
+          "fillRect": 12844,
+          "save": 12767,
+          "beginPath": 15668,
+          "rect": 1,
+          "clip": 1,
+          "moveTo": 11971,
+          "lineTo": 13411,
+          "stroke": 15667,
+          "restore": 12767,
+          "strokeRect": 1,
+          "fillText": 32,
+          "translate": 6368,
+          "rotate": 6368,
+          "arc": 7184,
+          "fill": 9248,
+          "ellipse": 2880
+        },
+        "atlasGenerationCalls": {},
+        "totalDrawCalls": 127179
+      },
+      {
+        "dpr": 2,
+        "zoom": 6.886956521739131,
+        "spriteCacheActive": false,
+        "drawCalls": {
+          "clearRect": 1,
+          "fillRect": 12844,
+          "save": 12767,
+          "beginPath": 15668,
+          "rect": 1,
+          "clip": 1,
+          "moveTo": 11971,
+          "lineTo": 13411,
+          "stroke": 15667,
+          "restore": 12767,
+          "strokeRect": 1,
+          "fillText": 32,
+          "translate": 6368,
+          "rotate": 6368,
+          "arc": 7184,
+          "fill": 9248,
+          "ellipse": 2880
+        },
+        "atlasGenerationCalls": {},
+        "totalDrawCalls": 127179
+      }
+    ]
+  }
+}

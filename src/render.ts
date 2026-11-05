@@ -1,11 +1,13 @@
 import { worldToScreen, type Camera, type DragPreview } from './camera'
-import { KNOCK_TIME, chargeShare, fatigueMods } from './sim/combat'
+import { KNOCK_TIME, chargeDecay, fatigueMods } from './sim/combat'
 import { flankHandles, formationCorners, massCenter } from './sim/formation'
 import { angDiff, forward, right } from './sim/math'
-import { previewFront } from './sim/orders'
-import type { Battle, Regiment, Soldier } from './sim/types'
+import { previewFront, previewGroupFront, type FrontPreview } from './sim/orders'
+import type { Battle, Regiment, Soldier, UnitDef, Side } from './sim/types'
 import { MAP_HEIGHT, MAP_WIDTH } from './sim/types'
 import { isCavalry, unitDef } from './sim/units'
+import { FATIGUE, FATIGUE_NAMES } from './sim/mechanics'
+import { elevationAt } from './sim/terrain'
 
 export interface RenderInput {
   battle: Battle
@@ -16,13 +18,39 @@ export interface RenderInput {
   dragRegId: number | null
   showBoxes: boolean
   showStamina: boolean
+  alpha?: number
+  visualTime?: number
+  cacheSprites?: boolean
+}
+
+interface Body {soldier:Soldier;reg:Regiment;def:UnitDef}
+const drawLists=new WeakMap<Battle,{time:number;bodies:Body[];entries:Body[]}>()
+function bodiesOf(battle:Battle):Body[] {
+  let cache=drawLists.get(battle)
+  if(!cache) {
+    cache={time:-1,bodies:[],entries:battle.regiments.flatMap(reg=>reg.soldiers.map(soldier=>({soldier,reg,def:unitDef(reg.type)})))}
+    drawLists.set(battle,cache)
+  }
+  if(cache.time!==battle.time) {
+    cache.time=battle.time;cache.bodies.length=0
+    for(const body of cache.entries) {
+      const s=body.soldier
+      if(s.alive||(s.deathTime>=0&&battle.time-s.deathTime<=0.55)) cache.bodies.push(body)
+    }
+    cache.bodies.sort((a,b)=>b.soldier.y-a.soldier.y)
+  }
+  return cache.bodies
 }
 
 export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d',{alpha:false,desynchronized:true})
   if (!ctx) return
   const { width, height } = canvas
   const { battle, camera } = view
+  // Select detail per glyph below. A global world-zoom cutoff also disabled
+  // batching for thousands of bodies on high-DPI or simply larger windows.
+  const cacheSprites=view.cacheSprites!==false
+  if(cacheSprites) prepareGlyphs(battle,camera.zoom)
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = '#141812'
   ctx.fillRect(0, 0, width, height)
@@ -35,6 +63,16 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   const mapH = origin.y - far.y
   ctx.fillStyle = '#3c4636'
   ctx.fillRect(left, top, mapW, mapH)
+  if (battle.terrain.kind !== 'flat') {
+    const gradient=ctx.createLinearGradient(left,top,left,top+mapH)
+    gradient.addColorStop(0,'rgba(214,194,113,0.23)'); gradient.addColorStop(1,'rgba(15,35,22,0.25)')
+    ctx.fillStyle=gradient; ctx.fillRect(left,top,mapW,mapH)
+    ctx.font='11px "Microsoft YaHei", sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#d7cc9e'
+    for (let y=30;y<MAP_HEIGHT;y+=30) {
+      const p=worldToScreen(camera,width,height,10,y)
+      ctx.fillText(`${Math.round(elevationAt(battle,10,y))} m`,p.x,p.y)
+    }
+  }
 
   ctx.save()
   ctx.beginPath()
@@ -73,8 +111,11 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   ctx.fillText('北', north.x, north.y)
 
   if (view.drag?.kind === 'box') drawBox(ctx, camera, width, height, view.drag)
-  if (view.drag?.kind === 'front' && view.dragRegId !== null) {
-    drawFrontPreview(ctx, camera, width, height, battle, view.dragRegId, view.drag)
+  if (view.drag?.kind === 'front') {
+    const d = view.drag
+    for (const plan of previewGroupFront(battle, view.selection, d.x0, d.y0, d.x1, d.y1)) {
+      drawFrontPreview(ctx, camera, width, height, battle, plan.id, d, plan)
+    }
   }
   for (const reg of battle.regiments) {
     if (reg.side !== 0 || reg.order !== 'move' || reg.aliveCount <= 0 || reg.routing) continue
@@ -91,23 +132,14 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
     strokeFormation(ctx, camera, width, height, reg, color)
   }
 
-  const bodies: { soldier: Soldier; reg: Regiment }[] = []
-  for (const reg of battle.regiments) {
-    for (const soldier of reg.soldiers) {
-      if (!soldier.alive && (soldier.deathTime < 0 || battle.time - soldier.deathTime > 0.55)) continue
-      bodies.push({ soldier, reg })
-    }
-  }
-  bodies.sort((a, b) => b.soldier.y - a.soldier.y)
-  for (const body of bodies) {
-    drawSoldier(ctx, camera, width, height, body.reg, body.soldier, view.selection.includes(body.reg.id))
+  for (const body of bodiesOf(battle)) {
+    drawSoldier(ctx, camera, width, height, body.reg, body.soldier, body.def, view.selection.includes(body.reg.id), view.alpha ?? 1, view.visualTime ?? battle.time, cacheSprites)
   }
 
   for (const projectile of battle.projectiles) {
     const ground = worldToScreen(camera, width, height, projectile.x, projectile.y)
     if (projectile.arc) {
-      const progress = projectile.duration > 0 ? Math.min(1, projectile.age / projectile.duration) : 1
-      const lift = Math.sin(progress * Math.PI) * projectile.apex * camera.zoom
+      const lift = Math.max(0,projectile.z-elevationAt(battle,projectile.x,projectile.y)) * camera.zoom
       ctx.fillStyle = 'rgba(20, 22, 16, 0.45)'
       ctx.beginPath()
       ctx.arc(ground.x, ground.y, Math.max(1.2, camera.zoom * 0.12), 0, Math.PI * 2)
@@ -136,8 +168,8 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   }
 
   for (const reg of battle.regiments) {
-    if (reg.aliveCount <= 0 && !reg.routing) continue
-    drawRegimentMarks(ctx, camera, width, height, battle, reg, view.selection.includes(reg.id), view.showStamina)
+    if (reg.aliveCount <= 0) continue
+    drawRegimentMarks(ctx, camera, width, height, battle, reg, view.selection.includes(reg.id), view.showStamina, view.visualTime ?? battle.time)
   }
   drawAttackOrders(ctx, camera, width, height, battle, view.selection, view.showStamina)
 
@@ -188,8 +220,9 @@ function drawFrontPreview(
   battle: Battle,
   regId: number,
   drag: DragPreview,
+  planned?: FrontPreview,
 ): void {
-  const preview = previewFront(battle, regId, drag.x0, drag.y0, drag.x1, drag.y1)
+  const preview = planned ?? previewFront(battle, regId, drag.x0, drag.y0, drag.x1, drag.y1)
   if (!preview) return
   const a = worldToScreen(camera, width, height, preview.x1, preview.y1)
   const b = worldToScreen(camera, width, height, preview.x2, preview.y2)
@@ -326,130 +359,145 @@ function strokePoly(ctx: CanvasRenderingContext2D, points: { x: number; y: numbe
   ctx.stroke()
 }
 
-function drawSoldier(
-  ctx: CanvasRenderingContext2D,
-  camera: Camera,
-  width: number,
-  height: number,
-  reg: Regiment,
-  soldier: Soldier,
-  selected: boolean,
-): void {
-  const def = unitDef(reg.type)
-  const p = worldToScreen(camera, width, height, soldier.x, soldier.y)
-  const radius = Math.max(3.1, def.radius * camera.zoom)
-  const dead = !soldier.alive
-  const prone = soldier.down > 0 ? soldier.down / KNOCK_TIME : 0
-  ctx.globalAlpha = dead ? 0.35 : 1 - prone * 0.65
-  ctx.fillStyle = soldier.flash > 0 ? '#f7f3ea' : selected ? (reg.side === 0 ? '#f0d078' : '#ffb089') : reg.side === 0 ? '#9ec3e0' : '#e0a090'
-  ctx.strokeStyle = selected ? '#fff4d2' : reg.side === 0 ? '#1d3e5c' : '#6a2e28'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  if (def.type === 'chariot') {
-    ctx.save()
-    ctx.translate(p.x, p.y)
-    ctx.rotate(-soldier.facing)
-    const length = Math.max(radius * 2.4, def.length * camera.zoom)
-    const breadth = Math.max(radius * 1.3, def.radius * 2 * camera.zoom)
-    ctx.roundRect(-length / 2, -breadth / 2, length, breadth, breadth / 2)
-    ctx.fill()
-    ctx.stroke()
-    if (!dead) drawNose(ctx, length / 2, breadth * 0.42, breadth * 0.55, reg)
-    ctx.restore()
-  } else if (def.type === 'general') {
-    ctx.save()
-    ctx.translate(p.x, p.y)
-    ctx.rotate(-soldier.facing)
-    ctx.ellipse(0, 0, radius * 1.55, radius * 0.95, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(radius * 0.15, -radius * 0.15, radius * 0.42, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-    if (!dead) drawNose(ctx, radius * 1.55, radius * 0.55, radius * 0.7, reg)
-    ctx.restore()
-  } else if (def.type === 'inquisitor') {
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-    if (!dead) {
-      const px = Math.cos(soldier.facing)
-      const py = -Math.sin(soldier.facing)
-      ctx.beginPath()
-      ctx.moveTo(p.x - py * radius * 0.7, p.y - px * radius * 0.7)
-      ctx.lineTo(p.x + py * radius * 0.7, p.y + px * radius * 0.7)
-      ctx.moveTo(p.x, p.y)
-      ctx.lineTo(p.x + px * (radius + 6), p.y + py * (radius + 6))
-      ctx.stroke()
-    }
-  } else if (isCavalry(def.type)) {
-    ctx.save()
-    ctx.translate(p.x, p.y)
-    ctx.rotate(-soldier.facing)
-    const heavy = def.type === 'heavyCavalry'
-    ctx.ellipse(0, 0, radius * (heavy ? 1.7 : 1.35), radius * (heavy ? 1.05 : 0.78), 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-    if (!dead) drawNose(ctx, radius * (heavy ? 1.7 : 1.35), radius * 0.55, radius * 0.7, reg)
-    ctx.restore()
-  } else if (def.type === 'musket') {
-    ctx.save()
-    ctx.translate(p.x, p.y)
-    ctx.rotate(-soldier.facing)
-    ctx.rect(-radius * 0.75, -radius * 0.75, radius * 1.5, radius * 1.5)
-    ctx.fill()
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(radius * 0.2, 0)
-    ctx.lineTo(radius * 2.4, 0)
-    ctx.stroke()
-    ctx.restore()
-  } else if (def.type === 'archer') {
-    ctx.moveTo(p.x, p.y - radius)
-    ctx.lineTo(p.x + radius, p.y)
-    ctx.lineTo(p.x, p.y + radius)
-    ctx.lineTo(p.x - radius, p.y)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-  } else {
-    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
+// Distant glyphs share a few atlas textures, including their rotation. This
+// avoids thousands of save/rotate/restore calls and tiny canvas texture swaps.
+interface Glyph {page:HTMLCanvasElement;x:number;y:number;slot:number}
+const footSprites=new Map<number,Glyph>()
+const glyphPages:{canvas:HTMLCanvasElement;pen:CanvasRenderingContext2D}[]=[]
+const glyphTypes=new WeakMap<UnitDef,number>()
+const glyphStyles=new Map<UnitDef,{r:number;half:number}>()
+let nextGlyphType=0
+let spriteZoom=-1
+let spriteBattle:Battle|null=null
+let spriteCell=32,spriteColumns=32,spritePageSlots=1024,spriteLimit=8192
+function prepareGlyphs(battle:Battle,zoom:number):void {
+  if(spriteZoom===zoom&&spriteBattle===battle) return
+  spriteZoom=zoom;spriteBattle=battle;footSprites.clear();glyphPages.length=0;glyphStyles.clear()
+  let half=16
+  for(const reg of battle.regiments) {
+    const def=unitDef(reg.type)
+    if(glyphStyles.has(def)) continue
+    const r=Math.max(2.5,def.radius*zoom)
+    const body=def.shape==='capsule'?Math.max(r*2.4,def.length*zoom)/2:isCavalry(def.type)?r*1.55:r
+    const front=def.shape==='capsule'?def.length*zoom/2:isCavalry(def.type)?r*1.35:r
+    // Include weapon rotation, feet, wounds and stroke width at every heading.
+    const extent=Math.ceil(Math.max(body,r*1.25+Math.max(1.6,r*.5),r+2,Math.hypot(front+Math.max(3,def.reach*zoom)+3,r+4))+2)
+    glyphStyles.set(def,{r,half:extent})
+    if(extent<=64) half=Math.max(half,extent)
   }
-  if (!dead && !isCavalry(def.type) && def.type !== 'chariot' && def.type !== 'musket' && def.type !== 'inquisitor') {
-    const reach = def.type === 'spear' ? radius + 7 : def.type === 'greatsword' ? radius + 5 : radius + 2
-    const fx = Math.cos(soldier.facing) * reach
-    const fy = -Math.sin(soldier.facing) * reach
-    ctx.beginPath()
-    ctx.moveTo(p.x, p.y)
-    ctx.lineTo(p.x + fx, p.y + fy)
-    ctx.stroke()
-    if (def.type === 'sword') {
-      const px = Math.cos(soldier.facing)
-      const py = -Math.sin(soldier.facing)
-      const ox = p.x + px * radius * 0.95
-      const oy = p.y + py * radius * 0.95
-      ctx.beginPath()
-      ctx.moveTo(ox + py * radius * 0.75, oy - px * radius * 0.75)
-      ctx.lineTo(ox - py * radius * 0.75, oy + px * radius * 0.75)
-      ctx.stroke()
-    }
-  }
-  ctx.globalAlpha = 1
+  spriteCell=32;while(spriteCell<half*2) spriteCell*=2
+  spriteColumns=Math.max(1,Math.floor(1024/spriteCell));spritePageSlots=spriteColumns**2
+  // At most 16 x 4 MiB atlas pages, including high-DPI large bodies/weapons.
+  spriteLimit=Math.min(8192,spritePageSlots*16)
 }
-
-/** A solid arrowhead on the front of a body, in the body's own rotated frame (+x is its facing). */
-function drawNose(ctx: CanvasRenderingContext2D, front: number, half: number, reach: number, reg: Regiment): void {
-  ctx.fillStyle = reg.side === 0 ? '#1d3e5c' : '#6a2e28'
+function drawSoldier(
+  ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number,
+  reg: Regiment, soldier: Soldier, def:UnitDef, selected: boolean, alpha: number, time: number,cacheSprites:boolean,
+): void {
+  const x=soldier.prevX+(soldier.x-soldier.prevX)*alpha,y=soldier.prevY+(soldier.y-soldier.prevY)*alpha
+  const p=worldToScreen(camera,width,height,x,y)
+  if(p.x < -30 || p.y < -30 || p.x > width+30 || p.y > height+30) return
+  const facing=soldier.prevFacing+angDiff(soldier.prevFacing,soldier.facing)*alpha
+  const r=Math.max(2.5,def.radius*camera.zoom),dead=!soldier.alive,flash=soldier.flash>0
+  const stride=Math.sin(time*Math.max(1,soldier.speed)*5+soldier.id)*r*.45*Math.min(1,soldier.speed)
+  const swingAngle=soldier.swing?-.75*Math.sin(Math.PI*soldier.swing.left/Math.max(.05,def.attack.windup)):0
+  const opacity=dead?.35:1-Math.min(1,soldier.down/KNOCK_TIME)*.65
+  if(cacheSprites&&glyphStyles.get(def)!.half<=64) {
+    const foot=def.large||dead?0:Math.max(-16,Math.min(16,Math.round(stride))),swing=Math.round(swingAngle*8)/8
+    let typeId=glyphTypes.get(def)
+    if(typeId===undefined) {typeId=nextGlyphType++;glyphTypes.set(def,typeId)}
+    const sector=((Math.round(facing*64/(Math.PI*2))%64)+64)%64
+    const flags=((((typeId*2+reg.side)*2+Number(selected))*2+Number(dead))*2+Number(flash))*2+Number(soldier.wounded)
+    const key=((flags*33+foot+16)*7+Math.round(swing*8)+6)*64+sector
+    let sprite=footSprites.get(key)
+    if(!sprite) {
+      let slot=footSprites.size
+      if(slot>=spriteLimit) {
+        const [oldKey,old]=footSprites.entries().next().value!;footSprites.delete(oldKey)
+        sprite=old;slot=old.slot
+      }
+      const pageIndex=Math.floor(slot/spritePageSlots)
+      if(!glyphPages[pageIndex]) {
+        const canvas=document.createElement('canvas');canvas.width=canvas.height=1024
+        glyphPages.push({canvas,pen:canvas.getContext('2d')!})
+      }
+      const page=glyphPages[pageIndex],x=(slot%spriteColumns)*spriteCell,y=Math.floor((slot%spritePageSlots)/spriteColumns)*spriteCell
+      sprite={page:page.canvas,x,y,slot}
+      const pen=page.pen
+      pen.clearRect(x,y,spriteCell,spriteCell);pen.save();pen.translate(x+spriteCell/2,y+spriteCell/2);pen.rotate(-sector*Math.PI*2/64)
+      paintBody(pen,def,reg.side,r,camera.zoom,dead,soldier.wounded,flash,selected,foot,swing)
+      pen.restore()
+      footSprites.set(key,sprite)
+    }
+    if(opacity!==1) ctx.globalAlpha=opacity
+    const half=glyphStyles.get(def)!.half
+    ctx.drawImage(sprite.page,sprite.x+spriteCell/2-half,sprite.y+spriteCell/2-half,half*2,half*2,p.x-half,p.y-half,half*2,half*2)
+    if(opacity!==1) ctx.globalAlpha=1
+  } else {
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(-facing);ctx.globalAlpha=opacity
+    paintBody(ctx,def,reg.side,r,camera.zoom,dead,soldier.wounded,flash,selected,stride,swingAngle)
+    ctx.restore()
+  }
+}
+function paintBody(ctx:CanvasRenderingContext2D,def:UnitDef,side:Side,r:number,zoom:number,dead:boolean,wounded:boolean,flash:boolean,selected:boolean,stride:number,swingAngle:number):void {
+  const ink = side === 0 ? '#1d3e5c' : '#6a2e28'
+  ctx.fillStyle = ink
+  if (!dead && !def.large) {
+    const foot = Math.max(1.6, r * 0.5)
+    ctx.fillRect(-r * 0.8 + stride, -r * 0.95, foot, foot)
+    ctx.fillRect(-r * 0.8 - stride, r * 0.45, foot, foot)
+  }
+  ctx.fillStyle = flash ? '#f7f3ea' : selected ? (side === 0 ? '#f0d078' : '#ffb089') : side === 0 ? '#9ec3e0' : '#e0a090'
+  ctx.strokeStyle = selected ? '#fff4d2' : ink
+  ctx.lineWidth = Math.max(1, zoom * 0.08)
   ctx.beginPath()
-  ctx.moveTo(front + reach, 0)
-  ctx.lineTo(front - reach * 0.35, -half)
-  ctx.lineTo(front - reach * 0.35, half)
-  ctx.closePath()
+  if (def.shape === 'capsule') {
+    const length = Math.max(r * 2.4, def.length * zoom)
+    ctx.roundRect(-length / 2, -r, length, r * 2, r * 0.6)
+  } else if (isCavalry(def.type)) {
+    ctx.ellipse(0, 0, r * 1.55, r * 0.85, 0, 0, Math.PI * 2)
+  } else {
+    ctx.arc(0, 0, r, 0, Math.PI * 2)
+  }
   ctx.fill()
+  ctx.stroke()
+  if (!dead && wounded) {
+    ctx.strokeStyle = '#e46b51'
+    ctx.beginPath(); ctx.arc(0, 0, r + 2, 0, Math.PI * 2); ctx.stroke()
+  }
+  if (!dead) {
+    if (isCavalry(def.type)) {
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    }
+    const front = def.shape === 'capsule' ? def.length * zoom / 2 : isCavalry(def.type) ? r * 1.35 : r
+    const tip = front + Math.max(3, def.reach * zoom)
+    ctx.save()
+    if (swingAngle) ctx.rotate(swingAngle)
+    ctx.strokeStyle = '#e4dbc1'
+    ctx.lineWidth = Math.max(1.1, zoom * 0.1)
+    ctx.beginPath()
+    if (def.weapon === 'bow') {
+      ctx.arc(front, 0, r * 0.9, -1.2, 1.2)
+      ctx.moveTo(front + Math.cos(1.2) * r * 0.9, -Math.sin(1.2) * r * 0.9)
+      ctx.lineTo(front + Math.cos(1.2) * r * 0.9, Math.sin(1.2) * r * 0.9)
+    } else if (def.weapon === 'claws') {
+      for (const side of [-1, 1]) { ctx.moveTo(r * 0.5, side * r * 0.7); ctx.lineTo(tip, side * r * 0.9); ctx.lineTo(tip - r * 0.3, side * r * 0.3) }
+    } else {
+      ctx.moveTo(r * 0.3, -r * 0.25); ctx.lineTo(tip, -r * 0.25)
+      if (def.weapon === 'spear' || def.weapon === 'halberd') {
+        ctx.moveTo(tip - 3, -r * 0.25 - 2); ctx.lineTo(tip, -r * 0.25); ctx.lineTo(tip - 3, -r * 0.25 + 2)
+      } else if (def.weapon !== 'musket') {
+        ctx.moveTo(front * 0.7, -r * 0.25 - 2); ctx.lineTo(front * 0.7, -r * 0.25 + 2)
+      }
+      if (def.weapon === 'halberd') { ctx.moveTo(tip - 3, -r * 0.25); ctx.lineTo(tip - 3, -r * 0.25 - 4) }
+      if (def.weapon === 'musket') { ctx.moveTo(r * 0.2, 0); ctx.lineTo(tip * 0.8, 0) }
+    }
+    ctx.stroke()
+    ctx.restore()
+    if (def.shieldBlock > 0) {
+      ctx.fillStyle = ink; ctx.beginPath(); ctx.ellipse(r * 0.7, r * 0.6, r * 0.3, r * 0.65, -0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+    }
+  }
 }
 
 function drawRegimentMarks(
@@ -461,6 +509,7 @@ function drawRegimentMarks(
   reg: Regiment,
   selected: boolean,
   showStamina: boolean,
+  time: number,
 ): void {
   const def = unitDef(reg.type)
   const corners = formationCorners(reg, def)
@@ -493,7 +542,10 @@ function drawRegimentMarks(
   ctx.textAlign = 'center'
   ctx.fillStyle = selected ? '#f3e6c2' : 'rgba(231, 225, 209, 0.8)'
   const label = `${reg.name.replace('南军', '').replace('北军', '')} ${reg.aliveCount}`
+  ctx.save()
+  ctx.globalAlpha *= reg.routing || reg.shattered ? 0.35 : reg.moraleState === 'wavering' ? 0.65 + 0.35 * Math.cos(time * Math.PI * 2) : 1
   ctx.fillText(label, mark.x, hpY - 4)
+  ctx.restore()
   if (showStamina) drawStamina(ctx, mark.x, missile ? mark.y - 58 : mark.y - 48, reg)
 }
 
@@ -577,11 +629,11 @@ function drawStamina(
   reg: Regiment,
 ): void {
   const def = unitDef(reg.type)
-  const state = reg.fatigue === 'exhausted' ? '力竭' : reg.fatigue === 'winded' ? '气喘' : '精神'
-  const left = Math.max(0, 1 - reg.exertion / 80)
-  const stat = fatigueMods(reg.fatigue).stat
+  const state = FATIGUE_NAMES[reg.fatigue]
+  const left = Math.max(0, 1 - reg.exertion / FATIGUE.exhausted.threshold)
+  const stat = fatigueMods(reg.fatigue).charge
   const full = Math.round(def.chargeBonus * stat)
-  const now = Math.round(def.chargeBonus * stat * chargeShare(reg.bodySpeed, def.chargeSpeed * stat))
+  const now = Math.round(def.chargeBonus * stat * Math.max(0, ...reg.soldiers.filter(s => s.alive).map(s => chargeDecay(s.chargeLeft))))
   const chargeText = full > 0 ? `冲锋 +${now}/${full}` : '冲锋 无'
   ctx.fillStyle = 'rgba(12, 14, 10, 0.82)'
   ctx.fillRect(x - 58, y - 34, 116, 38)
@@ -611,7 +663,7 @@ function ammoFraction(reg: Regiment, capacity: number): number {
 }
 
 function hpFraction(reg: Regiment): number {
-  const max = reg.initial * unitDef(reg.type).hp
+  const max = reg.initial * reg.modelHp
   if (max <= 0) return 0
   let hp = 0
   for (const soldier of reg.soldiers) if (soldier.alive) hp += Math.max(0, soldier.hp)

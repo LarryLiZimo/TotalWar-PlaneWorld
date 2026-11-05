@@ -4,7 +4,7 @@ import { right } from './sim/math'
 import {
   beginWidth,
   commandAttack,
-  commandFront,
+  commandGroupFront,
   commandMove,
   commandWidth,
   endWidth,
@@ -181,9 +181,6 @@ export function attachInput(
         const current = getSelection()
         const next = current.includes(hit.id) ? current.filter((id) => id !== hit.id) : [...current, hit.id]
         setSelection(next, hit.id)
-      } else if (event.detail === 2) {
-        const ids = battle.regiments.filter((reg) => reg.side === 0 && reg.type === hit.type && reg.aliveCount > 0).map((reg) => reg.id)
-        setSelection(ids, hit.id)
       } else {
         setSelection([hit.id], hit.id)
       }
@@ -191,14 +188,31 @@ export function attachInput(
       orderAt(point.x, point.y)
     } else if (session.mode === 'front' && moved > 8) {
       const ids = playerIds(battle, getSelection())
-      if (ids.length === 1) commandFront(battle, ids[0], session.wx, session.wy, point.x, point.y)
-      else if (ids.length > 1) commandMove(battle, ids, point.x, point.y, null)
+      if (ids.length > 0) commandGroupFront(battle, ids, session.wx, session.wy, point.x, point.y)
       gestureOrdered = true
     }
     session.mode = 'none'
     pointer.drag = null
     pointer.dragRegId = null
     session.widthId = null
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId)
+  })
+
+  canvas.addEventListener('pointercancel', () => {
+    if (session.widthId !== null) endWidth(getBattle(), session.widthId)
+    session.mode = 'none'
+    session.pointerId = -1
+    session.widthId = null
+    pointer.drag = null
+    pointer.dragRegId = null
+  })
+
+  canvas.addEventListener('dblclick', event => {
+    const point = locate(event), battle = getBattle()
+    const hit = regimentAt(battle, point.x, point.y)
+    if (!hit || hit.side !== 0) return
+    const ids = battle.regiments.filter(r => r.side === 0 && r.type === hit.type && r.aliveCount > 0 && !r.routing).map(r => r.id)
+    setSelection(ids, hit.id)
   })
 
   canvas.addEventListener(

@@ -1,0 +1,10 @@
+{
+  "date": "2026-11-04T21:02:39.676Z",
+  "scenario": "demo",
+  "seed": 42,
+  "models": 1974,
+  "paused": true,
+  "vector": "18 FPS · 帧 P95 65.6 ms\n模拟 15.4 / 29.2 ms · 绘制 4.4 / 7.0 ms",
+  "cached": "74 FPS · 帧 P95 20.4 ms\n模拟 13.8 / 22.3 ms · 绘制 3.7 / 4.6 ms",
+  "note": "Same browser and initial scene. FPS includes browser/compositor scheduling; rendering time measures JS canvas command submission."
+}

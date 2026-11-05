@@ -1,0 +1,113 @@
+{
+  "label": "after",
+  "scenario": "demo",
+  "seed": 42,
+  "startSeconds": 0,
+  "soldiers": 1974,
+  "steps": 600,
+  "meanMs": 14.718532500000007,
+  "p95Ms": 23.67119999999977,
+  "maxMs": 71.90980000000036,
+  "hotspots": [
+    {
+      "name": "separate src/sim/battle.ts:1580",
+      "ms": 1487
+    },
+    {
+      "name": "chargeAt src/sim/battle.ts:831",
+      "ms": 1112
+    },
+    {
+      "name": "nearestEnemy src/sim/battle.ts:1131",
+      "ms": 874
+    },
+    {
+      "name": "resolveMelee src/sim/battle.ts:1161",
+      "ms": 566
+    },
+    {
+      "name": "step src/sim/battle.ts:264",
+      "ms": 557
+    },
+    {
+      "name": "(garbage collector) :0",
+      "ms": 409
+    },
+    {
+      "name": "query src/sim/spatial.ts:41",
+      "ms": 392
+    },
+    {
+      "name": "moveSoldiers src/sim/battle.ts:703",
+      "ms": 358
+    },
+    {
+      "name": "nearestEnemyDistance :1967",
+      "ms": 353
+    },
+    {
+      "name": "gapBetween src/sim/formation.ts:57",
+      "ms": 273
+    },
+    {
+      "name": "query :41",
+      "ms": 257
+    },
+    {
+      "name": "fillGrid src/sim/battle.ts:689",
+      "ms": 226
+    },
+    {
+      "name": "updateMorale :1805",
+      "ms": 215
+    },
+    {
+      "name": "followSlot :926",
+      "ms": 171
+    },
+    {
+      "name": "meleeScreened src/sim/battle.ts:1236",
+      "ms": 138
+    },
+    {
+      "name": "attackLane src/sim/battle.ts:858",
+      "ms": 124
+    },
+    {
+      "name": "crowdOn :818",
+      "ms": 80
+    },
+    {
+      "name": "steer :1065",
+      "ms": 75
+    },
+    {
+      "name": "clear src/sim/spatial.ts:20",
+      "ms": 75
+    },
+    {
+      "name": "finishChargeFatigueBog src/sim/battle.ts:1751",
+      "ms": 73
+    },
+    {
+      "name": "moveSpeedOf :472",
+      "ms": 68
+    },
+    {
+      "name": "post node:inspector:115",
+      "ms": 65
+    },
+    {
+      "name": "forward :30",
+      "ms": 62
+    },
+    {
+      "name": "clearShot src/sim/battle.ts:1417",
+      "ms": 55
+    },
+    {
+      "name": "buildLive src/sim/battle.ts:666",
+      "ms": 45
+    }
+  ]
+}

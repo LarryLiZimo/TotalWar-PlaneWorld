@@ -1,11 +1,20 @@
-import { fitCamera, type Camera, type DragPreview } from './camera'
+import { fitCamera, focusRegiment, type Camera, type DragPreview } from './camera'
 import { attachInput, type PointerState } from './input'
 import { render } from './render'
 import { isBracing } from './sim/formation'
-import { createBattle, setAiEnabled, step } from './sim'
+import { setAiEnabled, step } from './sim'
 import type { Regiment } from './sim/types'
 import { SIM_DT } from './sim/types'
 import { unitDef } from './sim/units'
+import { SCENARIOS, createScenario, type Scenario } from './sim/scenarios'
+import { battleErrors, battleSnapshot } from './sim/diagnostics'
+import { unitIcon } from './icons'
+import { paintUnitPanel } from './unit-panel'
+import { commandBehavior } from './sim/orders'
+import { PerformanceHud } from './performance'
+import { BattleClient } from './battle-client'
+import { ARMIES,ARMY_SCALES,DEFAULT_SETUP,createArmyBattle,type ArmyId,type ArmyScale,type ArmySetup } from './sim/armies'
+import { setupArmyPicker } from './army-setup'
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')
 const score = document.querySelector<HTMLElement>('#score')
@@ -28,68 +37,159 @@ const pointer: PointerState = { drag: null, dragRegId: null, hoverId: null }
 const keys = new Set<string>()
 const groups = new Map<number, number[]>()
 
-let battle = createBattle()
+const scenarioSelect = document.querySelector<HTMLSelectElement>('#scenario')!
+for (const [id, label] of Object.entries(SCENARIOS)) scenarioSelect.add(new Option(label, id))
+const url = new URL(location.href)
+const performanceHud=new PerformanceHud(url.searchParams.get('perf')==='1')
+let scenario: Scenario = Object.hasOwn(SCENARIOS, url.searchParams.get('scenario') ?? '') ? url.searchParams.get('scenario') as Scenario : 'custom'
+scenarioSelect.value = scenario
+const suppliedSeed = Number(url.searchParams.get('seed'))
+let seed = url.searchParams.has('seed') && Number.isFinite(suppliedSeed) ? suppliedSeed : 20261104
+let armySetup:ArmySetup={
+  player:Object.hasOwn(ARMIES,url.searchParams.get('player')??'')?url.searchParams.get('player') as ArmyId:DEFAULT_SETUP.player,
+  enemy:Object.hasOwn(ARMIES,url.searchParams.get('enemy')??'')?url.searchParams.get('enemy') as ArmyId:DEFAULT_SETUP.enemy,
+  scale:ARMY_SCALES.includes(Number(url.searchParams.get('scale')) as ArmyScale)?Number(url.searchParams.get('scale')) as ArmyScale:4,
+}
+let battle = scenario==='custom'?createArmyBattle(armySetup,seed):createScenario(scenario, seed)
+let client:BattleClient|null=null
+let workerStatus='主线程'
+let fatalError=''
+const useWorker=url.searchParams.get('sim')!=='main'&&typeof Worker!=='undefined'
 let selection: number[] = []
 let inspectId: number | null = null
-let paused = false
+let paused = scenario==='custom'
 let speed = 1
-let seed = 20261103
 let accumulator = 0
 let last = performance.now()
+let hudAt = -Infinity
+let simMs = 0
+let pixelRatio = 1
 
 function resize(): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1)
+  if(pixelRatio!==dpr) camera.zoom*=dpr/pixelRatio
+  pixelRatio=dpr
   const rect = canvas!.getBoundingClientRect()
   canvas!.width = Math.max(1, Math.floor(rect.width * dpr))
   canvas!.height = Math.max(1, Math.floor(rect.height * dpr))
 }
 
 function restart(): void {
-  seed += 1
-  battle = createBattle(seed)
+  fatalError=''
+  client?.dispose();client=null
+  battle = scenario==='custom'?createArmyBattle(armySetup,seed):createScenario(scenario, seed)
   selection = []
   inspectId = null
   paused = false
   accumulator = 0
   pauseButton!.textContent = '暂停'
-  aiButton!.textContent = '北军停止'
-  aiButton!.classList.remove('on')
+  aiButton!.textContent = battle.aiEnabled?'北军行动':'北军停止'
+  aiButton!.classList.toggle('on',battle.aiEnabled)
   banner!.hidden = true
+  groups.clear()
+  pointer.drag = null
+  pointer.dragRegId = null
+  pointer.hoverId = null
+  hudAt = -Infinity
+  performanceHud.reset()
+  startClient()
 }
+
+function startClient():void {
+  if(!useWorker) return
+  workerStatus='独立模拟线程 · 启动中'
+  try {
+    client=new BattleClient({scenario,seed,setup:scenario==='custom'?armySetup:undefined},paused,speed,
+      current=>{battle=current;hudAt=-Infinity;workerStatus='独立模拟线程'},
+      times=>{for(const ms of times) performanceHud.record('sim',ms)},
+      message=>{paused=true;fatalError=`模拟停止：${message}`;pauseButton!.textContent='继续';banner!.hidden=false;banner!.textContent=fatalError;console.error(message)},
+    )
+    const active=client
+    battle.sendCommand=command=>active.command(command)
+  } catch(error) {workerStatus='主线程 · 独立线程启动失败';console.warn(error)}
+}
+function setPaused(value:boolean):void {
+  paused=value;accumulator=0;pauseButton!.textContent=paused?'继续':'暂停';client?.control(paused,speed)
+}
+let pausedBeforeSetup=paused
+const armyPicker=setupArmyPicker(armySetup,chosen=>{
+  armySetup=chosen;scenario='custom';scenarioSelect.value=scenario;speed=1
+  for(const button of speedButtons) button.classList.toggle('on',button.dataset.speed==='1')
+  restart();setAiEnabled(battle,true)
+  // Commands sent before the initial snapshot are queued by the worker in order.
+  if(client&&!client.ready) client.control(false,1)
+  url.searchParams.set('scenario','custom');url.searchParams.set('player',chosen.player);url.searchParams.set('enemy',chosen.enemy);url.searchParams.set('scale',String(chosen.scale));url.searchParams.set('seed',String(seed))
+  history.replaceState(null,'',url)
+},()=>setPaused(pausedBeforeSetup))
+document.querySelector('#army-setup')!.addEventListener('click',()=>{
+  pausedBeforeSetup=paused;setPaused(true);keys.clear();pointer.drag=null;pointer.dragRegId=null;armyPicker.open(armySetup)
+})
 
 function setSelection(ids: number[], inspect: number | null): void {
   selection = ids
   inspectId = inspect
+  hudAt = -Infinity
 }
 
-attachInput(canvas, camera, () => battle, () => selection, setSelection, pointer)
+scenarioSelect.addEventListener('change', () => {
+  scenario = scenarioSelect.value as Scenario
+  restart()
+  url.searchParams.set('scenario', scenario)
+  url.searchParams.set('seed', String(seed))
+  history.replaceState(null, '', url)
+})
+document.querySelector('#single-step')!.addEventListener('click', () => {
+  setPaused(true)
+  if(client) client.singleStep();else step(battle,SIM_DT)
+  hudAt=-Infinity
+})
+document.querySelector('#snapshot')!.addEventListener('click',async()=> {
+  const button=document.querySelector<HTMLButtonElement>('#snapshot')!;button.disabled=true
+  try {
+    const snapshot=client?await client.snapshot():{errors:battleErrors(battle),...battleSnapshot(battle)}
+    const blob=new Blob([JSON.stringify({scenario,armySetup,...snapshot as object},null,2)],{type:'application/json'})
+    const href=URL.createObjectURL(blob),link=document.createElement('a')
+    link.href=href;link.download=`battle-${scenario}-${seed}-${battle.time.toFixed(2)}.json`;link.click()
+    setTimeout(()=>URL.revokeObjectURL(href),1000)
+  } catch(error) {alert(String(error))} finally {button.disabled=false}
+})
+
+attachInput(canvas, camera, () => client?.display??battle, () => selection, setSelection, pointer)
+
+function toggleBehavior(key: 'run' | 'fireAtWill' | 'skirmish'): void {
+  const regs=battle.regiments.filter(r=>selection.includes(r.id) && isPlayer(r.id) && (key==='run'||unitDef(r.type).missile))
+  commandBehavior(battle,regs.map(r=>r.id),{[key]:!regs.some(r=>r[key])})
+  hudAt=-Infinity
+}
+document.querySelector('#gait')!.addEventListener('click',()=>toggleBehavior('run'))
+document.querySelector('#fire-at-will')!.addEventListener('click',()=>toggleBehavior('fireAtWill'))
+document.querySelector('#skirmish')!.addEventListener('click',()=>toggleBehavior('skirmish'))
 
 pauseButton.addEventListener('click', () => {
   if (battle.winner !== null) return
-  paused = !paused
-  pauseButton.textContent = paused ? '继续' : '暂停'
+  setPaused(!paused)
 })
 
 restartButton.addEventListener('click', restart)
 aiButton.addEventListener('click', () => {
-  setAiEnabled(battle, !battle.aiEnabled)
-  aiButton.textContent = battle.aiEnabled ? '北军行动' : '北军停止'
-  aiButton.classList.toggle('on', battle.aiEnabled)
+  setAiEnabled(battle,!battle.aiEnabled)
 })
 for (const button of speedButtons) {
   button.addEventListener('click', () => {
     speed = Number(button.dataset.speed)
+    client?.control(paused,speed)
     for (const other of speedButtons) other.classList.toggle('on', other === button)
   })
 }
 
 window.addEventListener('keydown', (event) => {
+  if(armyPicker.dialog.open) return
   keys.add(event.code)
   if (event.repeat) return
+  if (event.code==='KeyR') toggleBehavior('run')
   if (event.code === 'KeyP') {
     if (battle.winner === null) {
-      paused = !paused
-      pauseButton!.textContent = paused ? '继续' : '暂停'
+      setPaused(!paused)
     }
   }
   if (event.code === 'Space' || event.code === 'AltLeft' || event.code === 'AltRight') event.preventDefault()
@@ -121,6 +221,7 @@ function digitOf(code: string): number | null {
 }
 
 function frame(now: number): void {
+  performanceHud.record('frame',now-last)
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
   const pan = 48 * dt
@@ -128,18 +229,29 @@ function frame(now: number): void {
   if (keys.has('KeyS') || keys.has('ArrowDown')) camera.y -= pan
   if (keys.has('KeyA') || keys.has('ArrowLeft')) camera.x -= pan
   if (keys.has('KeyD') || keys.has('ArrowRight')) camera.x += pan
-  if (!paused && battle.winner === null) {
+  if (!client && !paused && battle.winner === null) {
     accumulator += dt * speed
     let steps = 0
+    const simulationStart=performance.now()
     while (accumulator >= SIM_DT && steps < 12) {
+      const start = performance.now()
       step(battle, SIM_DT)
+      simMs = performance.now() - start
+      performanceHud.record('sim',simMs)
       accumulator -= SIM_DT
       steps += 1
+      if(steps>=2&&performance.now()-simulationStart>=8) break
     }
-    if (steps === 12) accumulator = 0
+    // Bound catch-up work rather than freezing a frame with many heavy steps.
+    // Under load simulation slows in wall time; no fixed simulation step is skipped.
+    accumulator=Math.min(accumulator,0.25)
   }
+  const presentation=client?.presentation(now,paused)
+  if(client) simMs=client.stepMs
+  const renderStart=performance.now()
   render(canvas!, {
-    battle,
+    battle:presentation?.battle??battle,
+    cacheSprites:url.searchParams.get('sprites')!=='0',
     camera,
     selection,
     hoverId: pointer.hoverId,
@@ -147,17 +259,43 @@ function frame(now: number): void {
     dragRegId: pointer.dragRegId,
     showBoxes: keys.has('AltLeft') || keys.has('AltRight'),
     showStamina: keys.has('Space'),
+    alpha: presentation?1:paused || battle.winner !== null ? 1 : Math.min(1, accumulator / SIM_DT),
+    visualTime: presentation?.time??(paused ? battle.time : Math.max(0, battle.time - SIM_DT + Math.min(SIM_DT,accumulator))),
   })
-  updateHud()
+  performanceHud.record('render',performance.now()-renderStart)
+  if (now - hudAt >= 100) { updateHud(); hudAt = now }
+  performanceHud.paint(now,!paused&&battle.winner===null&&(client?client.limited:accumulator>=SIM_DT*2),workerStatus,battle.time)
   requestAnimationFrame(frame)
 }
 
 function updateHud(): void {
+  const armyButton=document.querySelector<HTMLButtonElement>('#army-setup')!
+  armyButton.textContent=scenario==='custom'?`部队 · ${armySetup.scale}×`:'部队配置'
+  armyButton.title=`${ARMIES[armySetup.player].name} 对 ${ARMIES[armySetup.enemy].name}`
+  aiButton!.textContent=battle.aiEnabled?'北军行动':'北军停止';aiButton!.classList.toggle('on',battle.aiEnabled)
+  const selected=battle.regiments.filter(r=>selection.includes(r.id) && isPlayer(r.id))
+  for (const [id,key] of [['gait','run'],['fire-at-will','fireAtWill'],['skirmish','skirmish']] as const) {
+    const button=document.querySelector<HTMLButtonElement>(`#${id}`)!
+    const eligible=selected.filter(r=>key==='run'||unitDef(r.type).missile)
+    const on=eligible.some(r=>r[key])
+    button.disabled=eligible.length===0
+    button.classList.toggle('on',on)
+    button.setAttribute('aria-pressed',String(on))
+    if (key==='run') {
+      const mixed=on && eligible.some(r=>!r.run)
+      const running=eligible.length===0 || on
+      const label=eligible.length===0?'默认跑步':mixed?'混合步态':running?'当前跑步':'当前走路'
+      button.textContent=mixed?'»/›':running?'»':'›'
+      button.setAttribute('aria-label',label)
+      button.title=`${label}；点击切换为${running?'走路':'跑步'}（R）。新命令默认跑步。`
+    }
+  }
   const men = (sideId: 0 | 1) =>
     battle.regiments.filter((reg) => reg.side === sideId).reduce((sum, reg) => sum + reg.aliveCount, 0)
   score!.textContent = `南军 ${men(0)} · 北军 ${men(1)}`
   const seconds = Math.floor(battle.time)
   clock!.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+  clock!.title = `种子 ${seed} · 上一步 ${simMs.toFixed(1)} ms / ${SIM_DT * 1000} ms 预算`
   const noticeText = battle.notices.map((notice) => notice.text).join('\n')
   if (notices!.dataset.text !== noticeText) {
     notices!.dataset.text = noticeText
@@ -172,6 +310,7 @@ function updateHud(): void {
   ensureRoster()
   const subject = battle.regiments.find((reg) => reg.id === (selection.length === 1 ? selection[0] : inspectId))
   paintDetail(subject ?? null)
+  if(fatalError) {banner!.hidden=false;banner!.textContent=fatalError;return}
   if (battle.winner === null) {
     banner!.hidden = true
     return
@@ -182,31 +321,47 @@ function updateHud(): void {
 
 function ensureRoster(): void {
   const root = roster!
-  if (root.dataset.seed === String(battle.seed) && root.childElementCount === battle.regiments.length) {
-    for (const button of root.querySelectorAll<HTMLButtonElement>('button')) {
-      const reg = battle.regiments.find((item) => item.id === Number(button.dataset.id))
-      if (!reg) continue
-      const text = `${reg.name}  ${reg.aliveCount}/${reg.initial}`
-      if (button.textContent !== text) button.textContent = text
-      button.className = selection.includes(reg.id) || inspectId === reg.id ? 'row on' : 'row'
+  const regs = battle.regiments.filter(r => r.side === 0)
+  const rosterKey = `${scenario}:${battle.seed}:${scenario==='custom'?JSON.stringify(armySetup):''}`
+  if (root.dataset.seed !== rosterKey || root.childElementCount !== regs.length) {
+    root.dataset.seed = rosterKey
+    root.replaceChildren()
+    for (const reg of regs) {
+      const def = unitDef(reg.type)
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'unit-card'
+      button.dataset.id = String(reg.id)
+      button.setAttribute('aria-label', reg.name)
+      button.innerHTML = `<span class="card-name">${def.name}</span><span class="portrait">${unitIcon(def)}</span><span class="card-count"></span><span class="card-state"></span><span class="card-hp"><i></i></span><span class="card-ammo"><i></i></span>`
+      button.addEventListener('click', event => {
+        const current = battle.regiments.find(r => r.id === reg.id)
+        if (!current) return
+        if (current.routing || current.aliveCount <= 0) { setSelection([],current.id); return }
+        const next = event.shiftKey || event.ctrlKey ? selection.includes(current.id) ? selection.filter(id => id !== current.id) : [...selection, current.id] : [current.id]
+        setSelection(next, current.id)
+      })
+      button.addEventListener('dblclick', () => {
+        const current=(client?.display??battle).regiments.find(r=>r.id===reg.id)
+        if(current) focusRegiment(camera,current)
+      })
+      root.append(button)
     }
-    return
   }
-  root.dataset.seed = String(battle.seed)
-  root.replaceChildren()
-  for (const reg of battle.regiments) {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'row'
-    button.dataset.id = String(reg.id)
-    button.textContent = `${reg.name}  ${reg.aliveCount}/${reg.initial}`
-    button.addEventListener('click', () => {
-      const current = battle.regiments.find((item) => item.id === reg.id)
-      if (!current) return
-      if (current.side === 0 && current.aliveCount > 0) setSelection([current.id], current.id)
-      else setSelection([], current.id)
-    })
-    root.append(button)
+  for (const button of root.querySelectorAll<HTMLButtonElement>('button')) {
+    const reg = battle.regiments.find(r => r.id === Number(button.dataset.id))!
+    const def = unitDef(reg.type)
+    const escaped=reg.soldiers.filter(s=>s.escaped).length
+    const state = reg.aliveCount <= 0 ? escaped?'已退场':'覆灭' : reg.shattered ? '彻底溃散' : reg.routing ? '溃逃' : reg.moraleState==='wavering' ? '动摇' : reg.engaged ? '近战' : reg.shot ? '射击/装填' : reg.order === 'move' ? (reg.run?'跑步':'步行') : reg.order === 'attack' ? '攻击' : '坚守'
+    button.className = `unit-card${selection.includes(reg.id) ? ' on' : ''}${reg.routing ? ' routing' : ''}${reg.routing||reg.aliveCount<=0?' uncontrollable':''}`
+    button.setAttribute('aria-pressed', String(selection.includes(reg.id)))
+    button.title = `${reg.name} · ${state}${escaped?` · 逃离 ${escaped}`:''} · 领导力 ${Math.round(reg.leadership)} · ${reg.routing||reg.aliveCount<=0?'仅查看，无法下令；双击定位仍在场的士兵':'Shift/Ctrl 追加选择，双击定位部队'}`
+    button.querySelector('.card-count')!.textContent = `${reg.aliveCount}/${reg.initial}`
+    button.querySelector('.card-state')!.textContent = state
+    ;(button.querySelector('.card-hp i') as HTMLElement).style.width = `${hpFraction(reg) * 100}%`
+    const ammo = def.missile ? reg.soldiers.reduce((sum, s) => sum + (s.alive ? s.ammo : 0), 0) / Math.max(1, reg.aliveCount * def.missile.ammo) : 0
+    ;(button.querySelector('.card-ammo') as HTMLElement).hidden = !def.missile
+    ;(button.querySelector('.card-ammo i') as HTMLElement).style.width = `${ammo * 100}%`
   }
 }
 
@@ -235,63 +390,13 @@ function paintDetail(subject: Regiment | null): void {
     root.append(hint)
     return
   }
-  const def = unitDef(subject.type)
-  const fatigue = subject.fatigue === 'exhausted' ? '力竭' : subject.fatigue === 'winded' ? '气喘' : '精神'
-  const order = subject.routing ? '溃逃' : subject.order === 'attack' ? '攻击' : subject.order === 'move' ? '移动' : '停留'
-  const foe = nearestAnchor(subject)
-  const bracing = foe ? isBracing(subject, def, foe.x, foe.y) : false
-  const text = [
-    subject.name,
-    `${def.name} · ${order}${bracing ? ' · 列阵' : ''}${subject.bogged ? ' · 停滞' : ''}`,
-    `人数 ${subject.aliveCount}/${subject.initial} · 领导力 ${Math.round(subject.leadership)} · ${fatigue}`,
-    hpFraction(subject).toFixed(3),
-    Math.max(0, subject.leadership / def.leadership).toFixed(3),
-  ].join('|')
-  if (root.dataset.mode === 'one' && root.dataset.text === text) return
-  root.dataset.mode = 'one'
-  root.dataset.text = text
-  root.replaceChildren()
-  const title = document.createElement('h2')
-  title.textContent = subject.name
-  const meta = document.createElement('p')
-  meta.textContent = text.split('|')[1]
-  const count = document.createElement('p')
-  count.textContent = text.split('|')[2]
-  const bars = document.createElement('div')
-  bars.className = 'bars'
-  bars.append(bar('生命', hpFraction(subject), subject.side === 0 ? '#7ea36a' : '#b55248'))
-  bars.append(bar('领导力', Math.max(0, subject.leadership / def.leadership), '#e0c27a'))
-  const stats = document.createElement('p')
-  stats.className = 'muted'
-  const trait =
-    def.antiLargeMa > 0
-      ? ` · 反大型 +${def.antiLargeMa}/+${def.antiLargeWs}`
-      : def.antiInfantryMa > 0
-        ? ` · 反步 +${def.antiInfantryMa}/+${def.antiInfantryWs}`
-        : def.shieldBlock > 0
-          ? ` · 盾牌 ${Math.round(def.shieldBlock * 100)}%`
-          : ''
-  stats.textContent = `攻击 ${def.meleeAttack} · 防御 ${def.meleeDefense} · 护甲 ${def.armor} · 武器 ${def.weaponBase}+${def.weaponAp}${trait}`
-  root.append(title, meta, count, bars, stats)
-}
-
-function bar(label: string, fraction: number, color: string): HTMLElement {
-  const row = document.createElement('div')
-  row.className = 'bar-row'
-  const name = document.createElement('span')
-  name.textContent = label
-  const track = document.createElement('div')
-  track.className = 'track'
-  const fill = document.createElement('div')
-  fill.style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`
-  fill.style.background = color
-  track.append(fill)
-  row.append(name, track)
-  return row
+  const def=unitDef(subject.type)
+  const foe=nearestAnchor(subject)
+  paintUnitPanel(root,subject,foe?isBracing(subject,def,foe.x,foe.y):false)
 }
 
 function hpFraction(reg: Regiment): number {
-  const max = reg.initial * unitDef(reg.type).hp
+  const max = reg.initial * reg.modelHp
   let hp = 0
   for (const soldier of reg.soldiers) if (soldier.alive) hp += Math.max(0, soldier.hp)
   return max <= 0 ? 0 : hp / max
@@ -313,4 +418,6 @@ function nearestAnchor(reg: Regiment): { x: number; y: number } | null {
 
 resize()
 fitCamera(camera, canvas.width, canvas.height)
+startClient()
+if(scenario==='custom') armyPicker.open(armySetup)
 requestAnimationFrame(frame)

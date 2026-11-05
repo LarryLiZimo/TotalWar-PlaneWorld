@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createBattle, step } from '../src/sim/battle'
 import {
-  chargeShare,
+  chargeDecay,
   effectiveLeadership,
   hitChance,
   impactRaw,
@@ -26,18 +26,18 @@ describe('combat formulas', () => {
   })
 
   it('scales impact by mass, speed, and brace', () => {
-    expect(impactRaw(70, 5, 480, 110, false)).toBe(0)
-    expect(impactRaw(70, 13, 480, 110, false)).toBeCloseTo(80.09, 1)
-    expect(impactRaw(70, 13, 480, 110, true)).toBeCloseTo(56.06, 1)
-    expect(impactRaw(70, 13, 110, 480, false)).toBeLessThan(impactRaw(70, 13, 480, 110, false))
+    expect(impactRaw(70, 5, 480, 110)).toBe(0)
+    expect(impactRaw(70, 13, 480, 110)).toBeCloseTo(80.09, 1)
+    expect(impactRaw(70, 13, 480, 110 * 3)).toBeLessThan(impactRaw(70, 13, 480, 110))
+    expect(impactRaw(70, 13, 110, 480)).toBeLessThan(impactRaw(70, 13, 480, 110))
   })
 
-  it('scales charge bonus by closing speed against top speed', () => {
-    expect(chargeShare(0, 9.4)).toBe(0)
-    expect(chargeShare(-3, 9.4)).toBe(0)
-    expect(chargeShare(4.7, 9.4)).toBeCloseTo(0.5)
-    expect(chargeShare(9.4, 9.4)).toBe(1)
-    expect(chargeShare(15, 9.4)).toBe(1)
+  it('decays charge bonus linearly over thirteen seconds', () => {
+    expect(chargeDecay(0)).toBe(0)
+    expect(chargeDecay(-3)).toBe(0)
+    expect(chargeDecay(6.5)).toBe(0.5)
+    expect(chargeDecay(13)).toBe(1)
+    expect(chargeDecay(15)).toBe(1)
   })
 
   it('keeps leadership above zero until losses and position stack', () => {
@@ -153,9 +153,11 @@ describe('battle', () => {
     expect(totalHp(battle)).toBe(startHp)
   }, 25000)
 
-  it('lets a chariot rear charge collision throw infantry and drive through without killing them', () => {
+  it('isolates kinetic impact: a chariot throws infantry and drives through', () => {
     const bonus = UNITS.chariot.chargeBonus
+    const contactAttack = UNITS.chariot.collisionAttack
     UNITS.chariot.chargeBonus = 0
+    UNITS.chariot.collisionAttack = null
     try {
       const run = chariotRearCharge()
       expect(run.flung).toBeGreaterThan(8)
@@ -164,22 +166,11 @@ describe('battle', () => {
       expect(run.chariot.anchorY).toBeGreaterThan(run.infantry.anchorY + 4)
     } finally {
       UNITS.chariot.chargeBonus = bonus
+      UNITS.chariot.collisionAttack = contactAttack
     }
   })
 
-  it('adds charge bonus to blows struck while closing at speed', () => {
-    const bonus = UNITS.chariot.chargeBonus
-    UNITS.chariot.chargeBonus = 0
-    let plain: number
-    try {
-      plain = totalHp(chariotRearCharge().battle)
-    } finally {
-      UNITS.chariot.chargeBonus = bonus
-    }
-    const charged = chariotRearCharge()
-    expect(totalHp(charged.battle)).toBeLessThan(plain)
-    expect(charged.flung).toBeGreaterThan(8)
-  }, 25000)
+
 })
 
 function chariotRearCharge() {

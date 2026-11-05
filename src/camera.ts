@@ -1,9 +1,19 @@
 import { MAP_HEIGHT, MAP_WIDTH } from './sim/types'
+import type { Regiment } from './sim/types'
 
 export interface Camera {
   x: number
   y: number
   zoom: number
+}
+
+/** Centre on the bodies currently on screen; the formation anchor can be far away. */
+export function focusRegiment(camera: Camera, reg: Pick<Regiment,'soldiers'>): boolean {
+  let x=0,y=0,count=0
+  for(const s of reg.soldiers) if(s.alive) {x+=s.x;y+=s.y;count++}
+  if(!count) return false
+  camera.x=x/count;camera.y=y/count
+  return true
 }
 
 export interface DragPreview {

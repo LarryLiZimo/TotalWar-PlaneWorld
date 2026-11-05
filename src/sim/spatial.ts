@@ -7,6 +7,7 @@ export class Spatial {
   private readonly cols: number
   private readonly rows: number
   private readonly buckets: number[][]
+  private readonly sideBuckets: [Array<number[]|undefined>,Array<number[]|undefined>]
   private readonly touched: number[] = []
   private seen: Uint32Array
   private token = 1
@@ -18,11 +19,17 @@ export class Spatial {
     this.cols = Math.ceil((MAP_WIDTH + MARGIN * 2) / cell)
     this.rows = Math.ceil((MAP_HEIGHT + MARGIN * 2) / cell)
     this.buckets = Array.from({ length: this.cols * this.rows }, () => [])
+    this.sideBuckets=[new Array(this.buckets.length),new Array(this.buckets.length)]
     this.seen = new Uint32Array(capacity)
   }
 
   clear(): void {
-    for (const index of this.touched) this.buckets[index].length = 0
+    for (const index of this.touched) {
+      this.buckets[index].length = 0
+      const south=this.sideBuckets[0][index],north=this.sideBuckets[1][index]
+      if(south) south.length=0
+      if(north) north.length=0
+    }
     this.touched.length = 0
   }
 
@@ -34,14 +41,24 @@ export class Spatial {
     return Math.min(this.rows - 1, Math.max(0, Math.floor((y + MARGIN) / this.cell)))
   }
 
-  insert(x: number, y: number, index: number): void {
+  insert(x: number, y: number, index: number, side?:0|1): void {
+    if (index >= this.seen.length) {
+      const grown = new Uint32Array(Math.max(index + 1, this.seen.length * 2))
+      grown.set(this.seen)
+      this.seen = grown
+    }
     const cell = this.row(y) * this.cols + this.col(x)
     const bucket = this.buckets[cell]
     if (bucket.length === 0) this.touched.push(cell)
     bucket.push(index)
+    if(side!==undefined) {
+      const bySide=this.sideBuckets[side]
+      const armyBucket=bySide[cell]??(bySide[cell]=[])
+      armyBucket.push(index)
+    }
   }
 
-  query(x: number, y: number, radius: number, out: number[]): void {
+  query(x: number, y: number, radius: number, out: number[], side?:0|1): void {
     out.length = 0
     this.token++
     if (this.token === 0xffffffff) {
@@ -52,10 +69,12 @@ export class Spatial {
     const maxX = this.col(x + radius)
     const minY = this.row(y - radius)
     const maxY = this.row(y + radius)
+    const buckets=side===undefined?this.buckets:this.sideBuckets[side]
     for (let iy = minY; iy <= maxY; iy++) {
       const rowStart = iy * this.cols
       for (let ix = minX; ix <= maxX; ix++) {
-        const bucket = this.buckets[rowStart + ix]
+        const bucket = buckets[rowStart + ix]
+        if(!bucket) continue
         for (let k = 0; k < bucket.length; k++) {
           const index = bucket[k]
           if (index >= this.seen.length) continue

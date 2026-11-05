@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-05T01:53:55.722Z",
+  "workerAsset": "battle.worker-cDg7WzKM.js",
+  "scale": 8,
+  "models": 3147,
+  "simulatedSeconds": 3.8499999999999943,
+  "checks": [
+    "real worker init",
+    "8x single health",
+    "queued move",
+    "walk toggle",
+    "fixed single steps",
+    "width change",
+    "transfer and recycle",
+    "authoritative snapshot"
+  ],
+  "errors": [],
+  "mainHeartbeat": {
+    "intervalMs": 10,
+    "samples": 76,
+    "p95Ms": 24.456699999999955,
+    "maxMs": 27.65969999999993
+  }
+}

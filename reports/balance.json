@@ -1,0 +1,270 @@
+{
+  "date": "2026-11-04T15:08:39.932Z",
+  "method": "Attacker charges a stationary defender frontally, 45 m approach, 45 s limit, seeds 1/7/42. Full default regiments; not cost-normalized; timeout is not a draw.",
+  "results": [
+    {
+      "attacker": "heavyCavalry",
+      "defender": "sword",
+      "seed": 1,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.8356,
+      "defenderHealth": 0.5203,
+      "attackerAlive": 36,
+      "defenderAlive": 48
+    },
+    {
+      "attacker": "heavyCavalry",
+      "defender": "sword",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.8613,
+      "defenderHealth": 0.5008,
+      "attackerAlive": 35,
+      "defenderAlive": 50
+    },
+    {
+      "attacker": "heavyCavalry",
+      "defender": "sword",
+      "seed": 42,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.8453,
+      "defenderHealth": 0.4959,
+      "attackerAlive": 36,
+      "defenderAlive": 46
+    },
+    {
+      "attacker": "shieldCavalry",
+      "defender": "sword",
+      "seed": 1,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.877,
+      "defenderHealth": 0.5652,
+      "attackerAlive": 36,
+      "defenderAlive": 53
+    },
+    {
+      "attacker": "shieldCavalry",
+      "defender": "sword",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.9083,
+      "defenderHealth": 0.5295,
+      "attackerAlive": 36,
+      "defenderAlive": 49
+    },
+    {
+      "attacker": "shieldCavalry",
+      "defender": "sword",
+      "seed": 42,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.877,
+      "defenderHealth": 0.6314,
+      "attackerAlive": 36,
+      "defenderAlive": 58
+    },
+    {
+      "attacker": "heavyCavalry",
+      "defender": "spear",
+      "seed": 1,
+      "seconds": 13.95,
+      "winner": "attacker",
+      "attackerHealth": 0.8898,
+      "defenderHealth": 0.7229,
+      "attackerAlive": 36,
+      "defenderAlive": 68
+    },
+    {
+      "attacker": "heavyCavalry",
+      "defender": "spear",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.4646,
+      "defenderHealth": 0.5543,
+      "attackerAlive": 22,
+      "defenderAlive": 54
+    },
+    {
+      "attacker": "heavyCavalry",
+      "defender": "spear",
+      "seed": 42,
+      "seconds": 14,
+      "winner": "attacker",
+      "attackerHealth": 0.8885,
+      "defenderHealth": 0.7309,
+      "attackerAlive": 36,
+      "defenderAlive": 69
+    },
+    {
+      "attacker": "shieldCavalry",
+      "defender": "spear",
+      "seed": 1,
+      "seconds": 37.55,
+      "winner": "defender",
+      "attackerHealth": 0.5871,
+      "defenderHealth": 0.6822,
+      "attackerAlive": 28,
+      "defenderAlive": 65
+    },
+    {
+      "attacker": "shieldCavalry",
+      "defender": "spear",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.5679,
+      "defenderHealth": 0.6408,
+      "attackerAlive": 28,
+      "defenderAlive": 61
+    },
+    {
+      "attacker": "shieldCavalry",
+      "defender": "spear",
+      "seed": 42,
+      "seconds": 41.6,
+      "winner": "defender",
+      "attackerHealth": 0.5783,
+      "defenderHealth": 0.7131,
+      "attackerAlive": 27,
+      "defenderAlive": 66
+    },
+    {
+      "attacker": "ogre",
+      "defender": "halberd",
+      "seed": 1,
+      "seconds": 19.7,
+      "winner": "defender",
+      "attackerHealth": 0.6436,
+      "defenderHealth": 0.8324,
+      "attackerAlive": 15,
+      "defenderAlive": 74
+    },
+    {
+      "attacker": "ogre",
+      "defender": "halberd",
+      "seed": 7,
+      "seconds": 23.7,
+      "winner": "defender",
+      "attackerHealth": 0.6006,
+      "defenderHealth": 0.8295,
+      "attackerAlive": 13,
+      "defenderAlive": 74
+    },
+    {
+      "attacker": "ogre",
+      "defender": "halberd",
+      "seed": 42,
+      "seconds": 25.7,
+      "winner": "defender",
+      "attackerHealth": 0.5798,
+      "defenderHealth": 0.8059,
+      "attackerAlive": 13,
+      "defenderAlive": 72
+    },
+    {
+      "attacker": "armoredOgre",
+      "defender": "halberd",
+      "seed": 1,
+      "seconds": 30.35,
+      "winner": "defender",
+      "attackerHealth": 0.5622,
+      "defenderHealth": 0.7059,
+      "attackerAlive": 15,
+      "defenderAlive": 64
+    },
+    {
+      "attacker": "armoredOgre",
+      "defender": "halberd",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.4711,
+      "defenderHealth": 0.6314,
+      "attackerAlive": 11,
+      "defenderAlive": 60
+    },
+    {
+      "attacker": "armoredOgre",
+      "defender": "halberd",
+      "seed": 42,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.4719,
+      "defenderHealth": 0.6105,
+      "attackerAlive": 10,
+      "defenderAlive": 56
+    },
+    {
+      "attacker": "monster",
+      "defender": "halberd",
+      "seed": 1,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.6762,
+      "defenderHealth": 0.8035,
+      "attackerAlive": 1,
+      "defenderAlive": 66
+    },
+    {
+      "attacker": "monster",
+      "defender": "halberd",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.6891,
+      "defenderHealth": 0.8395,
+      "attackerAlive": 1,
+      "defenderAlive": 69
+    },
+    {
+      "attacker": "monster",
+      "defender": "halberd",
+      "seed": 42,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.7054,
+      "defenderHealth": 0.8715,
+      "attackerAlive": 1,
+      "defenderAlive": 72
+    },
+    {
+      "attacker": "behemoth",
+      "defender": "halberd",
+      "seed": 1,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.7994,
+      "defenderHealth": 0.8826,
+      "attackerAlive": 1,
+      "defenderAlive": 72
+    },
+    {
+      "attacker": "behemoth",
+      "defender": "halberd",
+      "seed": 7,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.8568,
+      "defenderHealth": 0.9299,
+      "attackerAlive": 1,
+      "defenderAlive": 77
+    },
+    {
+      "attacker": "behemoth",
+      "defender": "halberd",
+      "seed": 42,
+      "seconds": 45,
+      "winner": "timeout",
+      "attackerHealth": 0.8376,
+      "defenderHealth": 0.9041,
+      "attackerAlive": 1,
+      "defenderAlive": 76
+    }
+  ]
+}
