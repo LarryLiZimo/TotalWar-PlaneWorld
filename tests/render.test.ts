@@ -5,6 +5,7 @@ import {createArmyBattle} from '../src/sim/armies'
 
 function drawingSurface(width:number,height:number) {
   const calls:{name:string;args:unknown[]}[]=[]
+  const contexts:{type:string;options?:CanvasRenderingContext2DSettings}[]=[]
   const context=new Proxy({}, {
     get:(_target,name)=> {
       if(name==='measureText') return (value:string)=>({width:value.length*7})
@@ -12,11 +13,25 @@ function drawingSurface(width:number,height:number) {
       return (...args:unknown[])=>{calls.push({name:String(name),args})}
     },set:()=>true,
   }) as CanvasRenderingContext2D
-  return {canvas:{width,height,getContext:()=>context} as unknown as HTMLCanvasElement,calls}
+  return {canvas:{width,height,getContext:(type:string,options?:CanvasRenderingContext2DSettings)=>{contexts.push({type,options});return context}} as unknown as HTMLCanvasElement,calls,contexts}
 }
 afterEach(()=>vi.unstubAllGlobals())
 
 describe('battle rendering under display scaling',()=> {
+  it.each([true,false])('keeps full-scene redraws synchronized without exposing a cleared frame (sprites %s)',cacheSprites=> {
+    vi.stubGlobal('document',{createElement:()=>drawingSurface(1024,1024).canvas})
+    const {canvas,calls,contexts}=drawingSurface(1600,900)
+    const battle=createArmyBattle({player:'blackpowder',enemy:'knightly',scale:4},42)
+    const camera:Camera={x:0,y:0,zoom:1};fitCamera(camera,canvas.width,canvas.height)
+    const view:RenderInput={battle,camera,selection:[],hoverId:null,drag:null,dragRegId:null,showBoxes:false,showStamina:false,cacheSprites}
+    for(let i=0;i<2;i++) {
+      calls.length=0;render(canvas,view)
+      expect(contexts.every(request=>request.options?.desynchronized===false)).toBe(true)
+      expect(calls[0]).toEqual({name:'fillRect',args:[0,0,1600,900]})
+      expect(calls.some(call=>call.name==='clearRect')).toBe(false)
+    }
+  })
+
   it.each([1,1.25,1.5,2])('keeps an overview on the sprite path at DPR %s',pixelRatio=> {
     vi.stubGlobal('document',{createElement:()=>drawingSurface(1024,1024).canvas})
     const {canvas,calls}=drawingSurface(1600*pixelRatio,900*pixelRatio)

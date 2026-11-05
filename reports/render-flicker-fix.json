@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-04",
+  "branch": "codex/empire-roster",
+  "symptom": "Whole battlefield/background flashes",
+  "diagnosis": "The visible canvas requested desynchronized rendering and cleared the full surface before repainting. Chrome can expose these intermediate states.",
+  "source": "https://developer.chrome.com/blog/desynchronized#avoiding-flicker",
+  "change": "Use synchronized opaque Canvas 2D presentation and start each frame with the full opaque background; retain sprite caching.",
+  "browser": "Chrome, real Vite app and Worker",
+  "beforeContext": { "alpha": false, "desynchronized": true },
+  "afterContexts": [
+    { "dpr": 1, "scale": 4, "alpha": false, "desynchronized": false },
+    { "dpr": 1.5, "scale": 8, "alpha": false, "desynchronized": false },
+    { "dpr": 2, "scale": 4, "alpha": false, "desynchronized": false }
+  ],
+  "checks": {
+    "oldImplementationFailsNewRegressions": 2,
+    "newRegressionsPass": 2,
+    "allTests": 281,
+    "productionBuild": "passed",
+    "productionWorker": "passed",
+    "generatedDocs": "passed"
+  },
+  "limitation": "Browser checks verify effective context attributes and running scenes; they do not measure the user display hardware scanout. Reload the page to recreate the canvas context."
+}
