@@ -7,7 +7,7 @@ import {step,setAiEnabled,createEmptyBattle,spawn} from '../src/sim/battle'
 import {unitPanelData} from '../src/unit-panel'
 
 describe('army presets and model scale',()=> {
-  it('keeps the exact classic army and fifteen regiments in all four presets',()=> {
+  it('keeps the exact classic army and fifteen regiments in every preset',()=> {
     expect(ARMIES.classic.units).toEqual([['sword',6],['spear',3],['greatsword',2],['archer',3],['musket',1]])
     for(const preset of Object.values(ARMIES)) expect(preset.units.reduce((n,[,c])=>n+c,0)).toBe(15)
     expect(ARMIES.monsters.units.find(([t])=>t==='spear')?.[1]).toBe(4)

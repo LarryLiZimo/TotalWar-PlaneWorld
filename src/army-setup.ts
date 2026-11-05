@@ -9,16 +9,18 @@ export function setupArmyPicker(initial:ArmySetup,onStart:(setup:ArmySetup)=>voi
   const selected=():ArmySetup=>({player:player.value as ArmyId,enemy:enemy.value as ArmyId,scale:Number(scale.value) as ArmyScale})
   function preview() {
     const chosen=selected()
-    document.querySelector('#scale-summary')!.textContent=`每队：步兵 ${unitModels('sword',chosen.scale)} · 骑兵/骑射 ${unitModels('heavyCavalry',chosen.scale)} · 射手 ${unitModels('archer',chosen.scale)} · 怪步 ${unitModels('ogre',chosen.scale)} · 战车 ${unitModels('chariot',chosen.scale)}；单体生命 ×${chosen.scale/4}`
+    document.querySelector('#scale-summary')!.textContent=`常规每队：步兵 ${unitModels('sword',chosen.scale)} · 骑兵/骑射 ${unitModels('heavyCavalry',chosen.scale)} · 射手 ${unitModels('archer',chosen.scale)} · 怪步 ${unitModels('ogre',chosen.scale)} · 战车 ${unitModels('chariot',chosen.scale)}；精锐：铁甲火枪 ${unitModels('ironsides',chosen.scale)} · 长管步枪/半狮鹫 ${unitModels('longRifle',chosen.scale)}；单体生命 ×${chosen.scale/4}`
     for(const [selector,id,side] of [['#player-preview',chosen.player,'玩家'],['#enemy-preview',chosen.enemy,'AI']] as const) {
       const root=document.querySelector(selector)!,summary=armySummary(id,chosen.scale)
       root.replaceChildren()
       const title=document.createElement('h2');title.textContent=`${side} · ${ARMIES[id].name}`
-      const count=document.createElement('p');count.className='muted';count.textContent=`${summary.regiments} 队 · ${summary.models} 个模型`
+      const count=document.createElement('p');count.className='muted';count.textContent=`${summary.regiments} 队 · ${summary.models} 个模型 · ${summary.budget.toLocaleString()} 预算点`
       const list=document.createElement('ul')
       for(const [type,n] of ARMIES[id].units) {
         const row=document.createElement('li'),name=document.createElement('span'),models=document.createElement('span')
-        name.textContent=`${n} × ${unitDef(type).name}`;models.textContent=unitDef(type).models===1?`${scaledFormation(type,chosen.scale).hp.toLocaleString()} 生命`:`${unitModels(type,chosen.scale)} / 队`;row.append(name,models);list.append(row)
+        const def=unitDef(type)
+        name.textContent=`${n} × ${def.name}`;row.title=`${def.role}；每队 ${def.cost} 预算点`
+        models.textContent=def.models===1?`${scaledFormation(type,chosen.scale).hp.toLocaleString()} 生命`:`${unitModels(type,chosen.scale)} / 队`;row.append(name,models);list.append(row)
       }
       root.append(title,count,list)
     }

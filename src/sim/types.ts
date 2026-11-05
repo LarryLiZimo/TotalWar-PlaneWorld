@@ -24,6 +24,27 @@ export type UnitType =
   | 'armoredOgre'
   | 'monster'
   | 'behemoth'
+  | 'militia'
+  | 'shieldSpear'
+  | 'flagellant'
+  | 'huntsmen'
+  | 'freeCompany'
+  | 'ironsides'
+  | 'longRifle'
+  | 'reiksguard'
+  | 'blackRose'
+  | 'pistolier'
+  | 'outrider'
+  | 'demigryph'
+  | 'demigryphHalberd'
+  | 'warWagon'
+  | 'heavyChariot'
+  | 'ogreGreatWeapon'
+  | 'ogreHalberd'
+  | 'giant'
+  | 'stoneBeast'
+  | 'captain'
+  | 'warriorPriest'
 export type OrderKind = 'hold' | 'move' | 'attack'
 export type Fatigue = 'fresh' | 'active' | 'winded' | 'tired' | 'veryTired' | 'exhausted'
 export type MoraleState = 'steady' | 'wavering' | 'routing' | 'shattered'
@@ -45,6 +66,10 @@ export interface Terrain { kind: 'flat' | 'slope'; rise: number; axis: 'x' | 'y'
 export interface MissileDef {
   base: number
   ap: number
+  /** Extra missile damage against large targets, split in the projectile's base/AP ratio. */
+  bonusVsLarge?: number
+  /** Projectiles fired by one model per reload; ammunition counts volleys. */
+  shotsPerVolley?: number
   reload: number
   range: number
   speed: number
@@ -64,6 +89,11 @@ export interface MissileDef {
 }
 
 export interface UnitDef {
+  /** Design budget per regiment at standard scale; does not restrict preset selection. */
+  cost: number
+  role: string
+  /** Override the category's model count at standard 4x army scale. */
+  standardModels?: number
   category: 'infantry' | 'ranged' | 'cavalry' | 'chariot' | 'monstrousInfantry' | 'monster'
   weapon: 'spear' | 'sword' | 'greatsword' | 'bow' | 'musket' | 'halberd' | 'claws'
   /** A single swing shares its weapon damage between at most this many victims. */

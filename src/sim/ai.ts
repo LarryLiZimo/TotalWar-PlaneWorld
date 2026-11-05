@@ -89,11 +89,11 @@ function decide(battle: Battle, reg: Regiment): AiIntent | null {
     let behindY = reg.anchorY
     if (friends.length > 0) {
       behindX = friends.reduce((sum, item) => sum + item.anchorX, 0) / friends.length
-      behindY = friends.reduce((sum, item) => sum + item.anchorY, 0) / friends.length + (reg.type === 'musket' ? 12 : 18)
+      behindY = friends.reduce((sum, item) => sum + item.anchorY, 0) / friends.length + (!missile.arc ? 12 : 18)
     }
     const behindD = Math.hypot(reg.anchorX - behindX, reg.anchorY - behindY)
     const facing = Math.atan2(foe.anchorY - reg.anchorY, foe.anchorX - reg.anchorX)
-    if (distance < 22 && reg.type !== 'musket') {
+    if (distance < 22 && missile.arc) {
       return intent(reg, 'attack', foe.anchorX, foe.anchorY, facing, foe.id, `kite:${foe.id}`)
     }
     if (behindD > 6 && distance > 40) {

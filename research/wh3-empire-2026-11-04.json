@@ -1,0 +1,183 @@
+{
+  "source": "https://github.com/Shazbot/WH3-Dump",
+  "commit": "773b6d85b429c2b4b48e235ec8c3d33b273af5cf",
+  "retrievedDate": "2026-11-04",
+  "notes": "Raw game-table reference only, not project configuration. num_men is the exported standard model count; base_reload_time excludes skills, experience and reload modifiers. Campaign and renowned variants excluded. No patch version inferred.",
+  "tables": [
+    "main_units",
+    "land_units",
+    "melee_weapons",
+    "missile_weapons",
+    "projectiles"
+  ],
+  "units": [
+    {
+      "key": "wh_main_emp_inf_spearmen_0",
+      "models": 120,
+      "multiplayerCost": 300,
+      "leadership": 60,
+      "meleeAttack": 20,
+      "meleeDefense": 34,
+      "chargeBonus": 4,
+      "melee": {
+        "base": 19,
+        "ap": 6,
+        "bonusVsLarge": 15,
+        "bonusVsInfantry": 0
+      }
+    },
+    {
+      "key": "wh_main_emp_inf_spearmen_1",
+      "models": 120,
+      "multiplayerCost": 350,
+      "leadership": 60,
+      "meleeAttack": 20,
+      "meleeDefense": 42,
+      "chargeBonus": 4,
+      "melee": {
+        "base": 19,
+        "ap": 6,
+        "bonusVsLarge": 15,
+        "bonusVsInfantry": 0
+      }
+    },
+    {
+      "key": "wh_main_emp_inf_swordsmen",
+      "models": 120,
+      "multiplayerCost": 375,
+      "leadership": 60,
+      "meleeAttack": 32,
+      "meleeDefense": 32,
+      "chargeBonus": 14,
+      "melee": {
+        "base": 21,
+        "ap": 7,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 0
+      }
+    },
+    {
+      "key": "wh_main_emp_inf_greatswords",
+      "models": 120,
+      "multiplayerCost": 850,
+      "leadership": 75,
+      "meleeAttack": 32,
+      "meleeDefense": 30,
+      "chargeBonus": 18,
+      "melee": {
+        "base": 10,
+        "ap": 25,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 14
+      }
+    },
+    {
+      "key": "wh_main_emp_inf_handgunners",
+      "models": 90,
+      "multiplayerCost": 600,
+      "leadership": 50,
+      "meleeAttack": 16,
+      "meleeDefense": 17,
+      "chargeBonus": 4,
+      "melee": {
+        "base": 21,
+        "ap": 3,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 0
+      },
+      "missile": {
+        "range": null,
+        "base": 5,
+        "ap": 17,
+        "baseReloadSeconds": null
+      }
+    },
+    {
+      "key": "wh3_dlc25_emp_inf_nuln_ironsides",
+      "models": 60,
+      "multiplayerCost": 825,
+      "leadership": 65,
+      "meleeAttack": 32,
+      "meleeDefense": 26,
+      "chargeBonus": 12,
+      "melee": {
+        "base": 21,
+        "ap": 7,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 0
+      },
+      "missile": {
+        "range": null,
+        "base": 5,
+        "ap": 17,
+        "baseReloadSeconds": null
+      }
+    },
+    {
+      "key": "wh3_dlc25_emp_inf_hochland_long_rifles",
+      "models": 32,
+      "multiplayerCost": 900,
+      "leadership": 60,
+      "meleeAttack": 18,
+      "meleeDefense": 20,
+      "chargeBonus": 4,
+      "melee": {
+        "base": 21,
+        "ap": 3,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 0
+      },
+      "missile": {
+        "range": null,
+        "base": 7,
+        "ap": 30,
+        "baseReloadSeconds": null
+      }
+    },
+    {
+      "key": "wh_main_emp_cav_reiksguard",
+      "models": 60,
+      "multiplayerCost": 1100,
+      "leadership": 75,
+      "meleeAttack": 34,
+      "meleeDefense": 31,
+      "chargeBonus": 62,
+      "melee": {
+        "base": 28,
+        "ap": 12,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 0
+      }
+    },
+    {
+      "key": "wh_main_emp_cav_demigryph_knights_0",
+      "models": 32,
+      "multiplayerCost": 1400,
+      "leadership": 80,
+      "meleeAttack": 40,
+      "meleeDefense": 38,
+      "chargeBonus": 60,
+      "melee": {
+        "base": 20,
+        "ap": 40,
+        "bonusVsLarge": 0,
+        "bonusVsInfantry": 0
+      }
+    },
+    {
+      "key": "wh_main_emp_cav_demigryph_knights_1",
+      "models": 32,
+      "multiplayerCost": 1450,
+      "leadership": 80,
+      "meleeAttack": 34,
+      "meleeDefense": 36,
+      "chargeBonus": 48,
+      "melee": {
+        "base": 18,
+        "ap": 38,
+        "bonusVsLarge": 25,
+        "bonusVsInfantry": 0
+      }
+    }
+  ]
+}
