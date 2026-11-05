@@ -61,6 +61,7 @@ let paused = scenario==='custom'
 let speed = 1
 let accumulator = 0
 let last = performance.now()
+let paintDeadline = last
 let hudAt = -Infinity
 let simMs = 0
 let pixelRatio = 1
@@ -221,6 +222,11 @@ function digitOf(code: string): number | null {
 }
 
 function frame(now: number): void {
+  // Keep spare CPU/GPU time for the simulation on high-refresh displays.
+  // Skip presentation work rather than accumulating redraws to catch up.
+  if(now+.25<paintDeadline) {requestAnimationFrame(frame);return}
+  const period=1000/60,late=Math.max(0,now-paintDeadline)
+  paintDeadline=now+period-late%period
   performanceHud.record('frame',now-last)
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now

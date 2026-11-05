@@ -1,6 +1,6 @@
 # 后续待办
 
-已完成的需求、现行规则、验证记录和性能限制统一见 [RULES.md](RULES.md)。单位数据见 [UNITS.md](UNITS.md)，复现与测试命令见 [TESTING.md](TESTING.md)。本文件只保留未完成事项，不再重复维护阶段进度。
+本文件只保留未完成工作。现行规则见 [RULES.md](RULES.md)，交互见 [CONTROLS.md](CONTROLS.md)，实现与接口见 [ARCHITECTURE.md](ARCHITECTURE.md)，具体内容见 [UNITS.md](UNITS.md) 与 [BATTLEFIELDS.md](BATTLEFIELDS.md)。已覆盖行为见 [TESTING.md](TESTING.md)，历史验证与性能限制见 [reports/README.md](reports/README.md)，不再另建逐轮进度文件。
 
 - [ ] 最大规模满速与画面稳定性：依据实际交战状态的 CPU/GPU Profile 优化选敌、邻域查询、遮挡和碰撞活动集合；复测实际倍速、帧 P95 与长帧，不能以低总占用或暂停画面代替实战结论。
 - [ ] 原作机制继续校准：核实完整疲劳/领导力条件、碰撞与击倒、逐动画接敌、单位/弹药数据库；将公开可确认的依据与本作近似分开。
@@ -9,4 +9,4 @@
 - [ ] RL 对战 AI：机制稳定后定义 observation/action/reward 接口、规则 AI 基线与自博弈评估；现有版本没有训练模型或奖励系统。
 - [ ] 持续人工验收：针对新问题检查动画可读性、操作手感、竞技平衡及原作隐藏行为，并把可程序验证的问题变成最小失败回归。
 
-框架迁移仍是评估方向，尚未实施；候选方案、收益范围与限制见 [后续优化与框架选择](RULES.md#后续优化与框架选择)。
+框架迁移仍是评估方向；候选方案、收益范围与历史限制见 [评估记录](reports/README.md#后续优化与框架选择)，当前工程边界见 [技术结构](ARCHITECTURE.md#性能边界与优化方向)。

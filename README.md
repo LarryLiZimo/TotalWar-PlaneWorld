@@ -1,29 +1,43 @@
 # 平原四兵
 
-俯视二维实时会战。现行规则、完成范围、性能记录与限制统一见 [RULES.md](RULES.md)，单位资料见 [UNITS.md](UNITS.md)，测试与复现方法见 [TESTING.md](TESTING.md)，后续事项见 [TODO.md](TODO.md)。原有阶段进度已并入规则。
+俯视二维实时会战。每个兵模独立移动、碰撞和攻击，玩家以部队为单位下令。
+
+## 从哪里开始读
+
+| 你想了解什么 | 文档 |
+| --- | --- |
+| 战斗怎样运作，各种属性是什么意思 | [RULES.md](RULES.md)：对象 → 命令 → 移动接触 → 战斗 → 状态 → 胜负 |
+| 怎样选择、拖线、下令和查看信息 | [CONTROLS.md](CONTROLS.md) |
+| 程序怎样组织与执行规则 | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| 每种兵的数值与能力配置 | [UNITS.md](UNITS.md) 与生成的 UNITS 子目录 |
+| 军队预设、规模、地图和复现场景 | [BATTLEFIELDS.md](BATTLEFIELDS.md)、[军队编成表](UNITS/ARMIES.md) |
+| 怎样自动测试、复现和定位问题 | [TESTING.md](TESTING.md) |
+| 历史验证、性能测量与容量限制 | [reports/README.md](reports/README.md) |
+| 战锤 3 的历史机制依据与差异 | [REFERENCES.md](REFERENCES.md) |
+| 尚未完成的工作 | [TODO.md](TODO.md) |
+
+规则与内容分别维护：例如“反大型怎样生效”在规则，“某队拥有多少反大型”在单位资料。算法、线程和绘图放在技术结构中，历史进度不再混入规则。
+
+## 运行
 
 ```bash
 npm install
 npm run dev
 ```
 
-打开 http://127.0.0.1:5173/ 。左键/底部兵牌选择，Shift 追加选择，双击底部兵牌定位部队且保持缩放，右键移动或攻击；右键拖线可把多支部队排成同一条战线。P 暂停，Alt 看队形，空格看体力，WASD 或中键平移，滚轮缩放。步态按钮 `»` 表示跑步、`›` 表示走路，R 可切换；新移动、拖线和攻击令默认跑步，顶部可切换自由射击和自动后撤。
+打开 http://127.0.0.1:5173/ 。选择双方军队与规模后开始，默认 4×。左键选择、右键移动或攻击、右键拖线设置战线；新命令默认跑步，R 切换走路。双击底部兵牌定位部队，P 暂停。完整操作见 [CONTROLS.md](CONTROLS.md)。
 
-默认先选择玩家与 AI 的四套军队，规模可选 1/2/3/4/6/8，默认 4×；单体生命同样按规模缩放。点击「开始战斗」后 AI 自动行动，顶部「部队」可重新配置。完整编成与人数/生命表见 [UNITS/ARMIES.md](UNITS/ARMIES.md)。
-
-冲锋按个人有效速度判定，不要求最低距离或队形；前排接敌后，未贴敌后排仍会继续冲锋。长矛兵抵御大型冲锋，长戟兵抵御所有冲锋。溃兵继续跟随队形，任一人到边界后整队永久退出。细节见 [战斗规则](RULES.md#冲锋列阵与反制) 与 [退场规则](RULES.md#领导力恐惧与溃逃)。
-
-顶部可切换 19 个场景，包括骑兵、战车、火枪、背袭、单体、混编拖线、扩展兵种，以及低速碰撞、负伤、惊骇/将军阵亡、高低地、战车散阵转攻、骑兵近战转攻、减员补位、低速挤出、散兵参战和友军穿行；支持固定种子、单步推进和导出现场。旧诊断场景默认北军停止主动下令，可手动开启 AI。
+## 检查与迭代
 
 ```bash
-npm run check             # 构建 + 全部自动测试 + 单位文档一致性
-npm run test:regression   # 快速回归
-npm run test:watch        # 持续迭代
-npm run test:worker       # 构建并检查真实模拟线程消息
-npm run bench            # 输出无界面性能报告
-npm run profile -- melee 90 # 推进到第 90 秒，采样 30 秒混战 CPU 热点
-npm run balance          # 24 次固定种子兵种对抗
-npm run docs:units       # 改数值后生成单位文档
+npm run check               # 类型/构建、全部测试、生产 Worker、单位文档一致性
+npm run test:regression     # 既有问题与机制快速回归
+npm run test:watch          # 持续迭代
+npm run test:worker         # 真实 Worker 消息检查
+npm run bench              # 无界面性能报告
+npm run profile -- melee 90 # 采样第 90 秒之后的混战
+npm run balance            # 固定种子兵种对抗
+npm run docs:units         # 单位配置变更后生成资料
 ```
 
-自动测试覆盖核心机制、输入、状态传输与显示路径，另有真实 Worker 消息检查，数量以 `npm test` 输出为准。F3 可查看帧间隔及模拟/绘制提交耗时；固定场景可直接验证补位、战车挤出与后备冲锋。核心模拟位于 `src/sim`，不依赖 DOM，页面默认由独立 Worker 推进，可直接创建小规模场景自动测试。完整覆盖与性能限制见 [规则中的验收说明](RULES.md#验证范围与完成状态)。
+默认模拟在独立 Worker 中运行，画面使用显示插值；无界面测试可直接创建小场景验证行为。测试数量以实际输出为准，性能需同时看模拟实际倍速和画面帧时间，具体步骤见 [TESTING.md](TESTING.md)。

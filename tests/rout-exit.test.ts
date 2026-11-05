@@ -17,7 +17,7 @@ function battlefield() {
 function tick(b:Battle,seconds:number) {for(let i=0;i<seconds/.05;i++) step(b,.05)}
 
 describe('routing units leave the battlefield',()=> {
-  it.each([['sword',12,4],['general',1,1],['heavyCavalry',6,3],['chariot',4,2]] as const)('%s follows its formation from inside the map until the whole unit exits',(type,models,files)=> {
+  it.each([['sword',12,4],['general',1,1],['heavyCavalry',6,3],['chariot',4,2]] as const)('%s flees from inside the map until the whole unit exits',(type,models,files)=> {
     const b=battlefield(),r=spawn(b,0,type as UnitType,'routed',120,24,-Math.PI/2,{models,files})
     const health=r.soldiers.map(s=>s.hp)
     route(r);tick(b,1)
@@ -38,15 +38,53 @@ describe('routing units leave the battlefield',()=> {
     expect(r.aliveCount).toBe(0)
     expect(battleSnapshot(b).regiments.find(item=>item.id===r.id)?.escaped).toBe(8)
   })
-  it('keeps the existing formation-following movement rather than making each body flee independently',()=> {
+  it('lets a straggler escape with the crowd instead of returning to an old formation slot',()=> {
     const b=battlefield(),r=spawn(b,0,'sword','routed',120,100,-Math.PI/2,{models:3,files:1})
     route(r)
-    // This body is off to one side. It should return toward its slot as the block flees south.
-    Object.assign(r.soldiers[0],{x:140,y:100,prevX:140,prevY:100,facing:Math.PI})
+    // Off to one side, already facing the shared escape direction.
+    Object.assign(r.soldiers[0],{x:140,y:100,prevX:140,prevY:100,facing:-Math.PI/2})
     tick(b,2)
-    expect(r.soldiers[0].x).toBeLessThan(138.5)
+    expect(r.soldiers[0].x).toBeGreaterThan(139)
+    expect(r.soldiers[0].y).toBeLessThan(98)
     expect(r.anchorY).toBeLessThan(100)
     expect(r.aliveCount).toBe(3)
+  })
+  it.each([0,1] as const)('breaks ranks with different paces while side %s keeps one escape direction',side=> {
+    const b=battlefield(),facing=side===0?-Math.PI/2:Math.PI/2
+    const r=spawn(b,side,'sword','routed',140,110,facing,{models:24,files:6})
+    route(r)
+    const positions=r.soldiers.map(s=>({x:s.x,y:s.y}))
+    step(b,.05)
+    for(const [i,s] of r.soldiers.entries()) expect(Math.hypot(s.x-positions[i].x,s.y-positions[i].y)).toBeLessThan(.1)
+    tick(b,6)
+    const forward=r.soldiers.map((s,i)=>(s.y-positions[i].y)*(side===0?-1:1))
+    expect(Math.min(...forward)).toBeGreaterThan(8)
+    expect(Math.max(...forward)-Math.min(...forward)).toBeGreaterThan(2)
+    expect(r.soldiers.some((s,i)=>Math.abs(s.x-positions[i].x)>.5)).toBe(true)
+    for(const s of r.soldiers) expect(Math.abs(s.vx)).toBeLessThan(Math.abs(s.vy)*.5)
+    expect(battleErrors(b)).toEqual([])
+  })
+  it('replays the same disordered escape exactly without drawing extra combat random numbers',()=> {
+    const run=()=> {
+      const b=battlefield(),r=spawn(b,0,'sword','routed',140,110,-Math.PI/2,{models:16,files:4})
+      route(r)
+      const random=b.rng;let calls=0;b.rng=()=>{calls++;return random()}
+      tick(b,5)
+      expect(calls).toBe(0)
+      return battleSnapshot(b)
+    }
+    expect(run()).toEqual(run())
+  })
+  it('returns scattered survivors to formation only after rallying, without teleporting their bodies',()=> {
+    const b=battlefield(),r=spawn(b,0,'sword','routed',140,110,-Math.PI/2,{models:12,files:4})
+    route(r);tick(b,4)
+    Object.assign(r,{shattered:false,routeTime:12,rallyTime:7.95})
+    const before=r.soldiers.map(s=>({x:s.x,y:s.y}))
+    step(b,.05)
+    expect(r.routing).toBe(false);expect(r.order).toBe('hold')
+    for(const [i,s] of r.soldiers.entries()) expect(Math.hypot(s.x-before[i].x,s.y-before[i].y)).toBeLessThan(.4)
+    expect(r.soldiers.every(s=>Number.isFinite(s.x)&&Number.isFinite(s.y))).toBe(true)
+    expect(battleErrors(b)).toEqual([])
   })
   it('preserves already dead soldiers when one survivor takes the rest of the regiment out',()=> {
     const b=battlefield(),r=spawn(b,0,'sword','routed',120,30,-Math.PI/2,{models:3,files:1})

@@ -53,6 +53,7 @@ interface Scratch {
 
 const scratches = new WeakMap<Battle, Scratch>()
 const compactedCounts = new WeakMap<Regiment, number>()
+const attackPicks = new WeakMap<Soldier,{target:Soldier;index:number}>()
 
 function scratchOf(battle: Battle): Scratch {
   let found = scratches.get(battle)
@@ -327,7 +328,7 @@ export function step(battle: Battle, dt: number): void {
   finishChargeFatigueBog(battle, live, pad, dt)
   updateMorale(battle, dt)
   for (const reg of battle.regiments) {
-    if (compactedCounts.get(reg) !== reg.aliveCount) {
+    if (!reg.routing && compactedCounts.get(reg) !== reg.aliveCount) {
       compactRanks(reg)
       compactedCounts.set(reg, reg.aliveCount)
     }
@@ -588,7 +589,12 @@ function moveRegiments(battle: Battle, dt: number): void {
     }
     const def = unitDef(reg.type)
     if (reg.routing) {
-      relaid = march(battle, reg, def, fleeHeading(battle, reg), Infinity, dt, 0.5)
+      // This is the crowd's shared escape direction, not a marching formation.
+      // Its marker follows actual bodies, so stragglers never chase old slots.
+      const center=aliveCenter(reg)!
+      reg.anchorX=center.x;reg.anchorY=center.y
+      reg.facing=fleeHeading(battle,reg)
+      reg.anchorSpeed=reg.bodySpeed
       reg.destX = reg.anchorX
       reg.destY = reg.anchorY
       reg.destFacing = reg.facing
@@ -644,13 +650,12 @@ function moveRegiments(battle: Battle, dt: number): void {
  * the new way, and foot do it without stopping.
  */
 function march(battle: Battle, reg: Regiment, def: UnitDef, heading: number, distance: number, dt: number, minCohesion: number): boolean {
-  // Routing formations keep marching beyond the normal inset until a body reaches the exit.
-  const mapInset=reg.routing?-Infinity:3
+  const mapInset=3
   const footed = def.turnRadius === 0
-  const aim = reg.routing ? heading : travelFacing(def, reg.destFacing, heading)
+  const aim = travelFacing(def, reg.destFacing, heading)
   const err = angDiff(reg.facing, aim)
   const closing = reg.order === 'attack' && !def.missile && distance < releaseRange(def) * 2
-  if (!closing && !reg.routing && Math.abs(err) > REFORM_TURN) {
+  if (!closing && Math.abs(err) > REFORM_TURN) {
     if (footed) {
       reformMoving(reg, reg.files, aim)
     } else {
@@ -659,7 +664,7 @@ function march(battle: Battle, reg: Regiment, def: UnitDef, heading: number, dis
     }
     return true
   }
-  const wait = reg.plow > 0 ? 30 : reg.routing ? 6 : 4
+  const wait = reg.plow > 0 ? 30 : 4
   const keepUp = closing ? 1 : reg.trail > wait ? 0 : clamp(1 - (reg.trail - 1.5) / 3, minCohesion, 1)
   const settling = closing ? 1 : clamp(1.1 - reg.lag / 16, 0.75, 1)
   const top = moveSpeedOf(reg) * keepUp * settling * slopeSpeed(battle, heading)
@@ -740,16 +745,16 @@ function buildLive(battle: Battle, pad: Scratch): Live[] {
   return live
 }
 
-function fillGrid(pad: Scratch, live: Live[]): Spatial {
+function fillGrid(pad: Scratch, live: Live[], withSides=true): Spatial {
   const grid = pad.spatial
   grid.clear()
   for (let i = 0; i < live.length; i++) {
     const item = live[i]
     if (!item.s.alive) continue
     if (item.def.shape === 'capsule') {
-      for (const point of shapePoints(item.s, item.def)) grid.insert(point.x, point.y, i,item.reg.side)
+      for (const point of shapePoints(item.s, item.def)) grid.insert(point.x, point.y, i,withSides?item.reg.side:undefined)
     } else {
-      grid.insert(item.s.x, item.s.y, i,item.reg.side)
+      grid.insert(item.s.x, item.s.y, i,withSides?item.reg.side:undefined)
     }
   }
   return grid
@@ -760,7 +765,7 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
   const buf = pad.buf
   const lagSum = new Map<Regiment, SlotTally>()
   const speedSum = new Map<Regiment, number>()
-  const press: Press = { live, grid, buf, near: new Map(), claims: new Map(), warmed:new Set(),bounds:new Map() }
+  const press: Press = { live, grid, buf, near: new Map(), claims: new Map(), warmed:new Set(),bounds:new Map(),lanes:new Map() }
   for (const reg of battle.regiments) {
     reg.nearEnemy = false
     lagSum.set(reg, { total: 0, trail: 0, count: 0 })
@@ -770,7 +775,8 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
     const { s, reg, def } = item
     // A target's bodies can have moved since another regiment examined them.
     press.bounds.delete(reg)
-    const nearby = nearestEnemy(live, grid, buf, i, def.reach + 0.5, reg.order === 'hold')
+    press.lanes.delete(reg)
+    const nearby = reg.routing?null:nearestEnemy(live, grid, buf, i, def.reach + 0.5, reg.order === 'hold')
     const foe = reg.retargeting ? nearestEnemy(live,grid,buf,i,def.reach+0.5,false,reg.targetId) : nearby
     const gapToFoe = foe ? gapBetween(s, def, foe.s, foe.def) : Infinity
     if (foe && gapToFoe < 14) reg.nearEnemy = true
@@ -805,6 +811,8 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
     const inFight = !!foe && reg.order !== 'move' && reg.plow <= 0 && !reg.routing && gapToFoe <= (runningIn ? 0.15 : def.reach)
     if (s.down > 0) {
       lieDown(s, dt)
+    } else if(reg.routing) {
+      fleeSoldier(battle,reg,def,s,gait,lever,dt)
     } else if (def.type==='chariot' && (reg.order==='attack'||reg.order==='move') && !reg.routing) {
       if(reg.order==='attack') driveChariot(battle,reg,def,s,gait,lever,dt)
       else {
@@ -845,7 +853,24 @@ function moveSoldiers(battle: Battle, live: Live[], pad: Scratch, dt: number): v
     reg.lag = sum.count > 0 ? sum.total / sum.count : 0
     reg.trail = sum.count > 0 ? sum.trail / sum.count : 0
     reg.bodySpeed = reg.aliveCount > 0 ? (speedSum.get(reg) ?? 0) / reg.aliveCount : 0
+    if(reg.routing&&reg.aliveCount>0) {
+      const center=aliveCenter(reg)!
+      reg.anchorX=reg.destX=center.x;reg.anchorY=reg.destY=center.y
+    }
   }
+}
+
+/** Individuals stream in one direction, with smooth differences instead of ranks.
+ * Identity-derived variation is repeatable and does not consume combat RNG. */
+function fleeSoldier(battle:Battle,reg:Regiment,def:UnitDef,s:Soldier,gait:number,lever:number,dt:number):void {
+  let hash=Math.imul(s.id^battle.seed^Math.imul(reg.routCount,0x9e3779b9),0x45d9f3b)
+  hash=(hash^(hash>>>16))>>>0
+  const phase=(hash&0xffff)/0xffff*Math.PI*2
+  const pace=(hash>>>16)/0xffff
+  const heading=reg.facing+(pace-.5)*.3+Math.sin(battle.time*.85+phase)*.1
+  const speed=gait*(.84+pace*.32+Math.sin(battle.time*.6+phase)*.035)
+  s.idle=false
+  steer(def,s,heading,speed,speed,lever,dt,Infinity,30,false)
 }
 
 /**
@@ -888,6 +913,7 @@ interface Press {
   claims: Map<Soldier, number>
   warmed: Set<Regiment>
   bounds: Map<Regiment,{minX:number;maxX:number;minY:number;maxY:number}>
+  lanes: Map<Regiment,{minR:number;maxR:number;minL:number;maxL:number}>
 }
 
 /** Men already this close round an enemy soldier count as crowding him. */
@@ -951,8 +977,16 @@ function chargeAt(
   let nearestSq = Infinity
   let nearest:Soldier|null=null
   let bestCost = Infinity
+  let bestIndex = Infinity
   let pick: Soldier | null = null
-  for (const foe of target.soldiers) {
+  const previous=attackPicks.get(s)
+  if(previous?.target.alive&&target.soldiers[previous.index]===previous.target) {
+    const foe=previous.target,d=Math.hypot(foe.x-s.x,foe.y-s.y)
+    const crowd=crowdOn(press,foe,reg.side)-(d<=CROWD_RADIUS?1:0)+(press.claims.get(foe)??0)
+    pick=foe;bestIndex=previous.index;bestCost=d+CROWD_COST*Math.max(0,crowd)
+  }
+  for (let index=0;index<target.soldiers.length;index++) {
+    const foe=target.soldiers[index]
     if (!foe.alive) continue
     const dx=foe.x-s.x,dy=foe.y-s.y,d2=dx*dx+dy*dy
     if(d2<nearestSq) {nearestSq=d2;nearest=foe}
@@ -963,12 +997,15 @@ function chargeAt(
     const self = d <= CROWD_RADIUS ? 1 : 0
     const crowd = crowdOn(press, foe, reg.side) - self + (press.claims.get(foe) ?? 0)
     const cost = d + CROWD_COST * Math.max(0, crowd)
-    if (cost < bestCost) {
+    if (cost < bestCost || (cost===bestCost&&index<bestIndex)) {
       bestCost = cost
+      bestIndex = index
       pick = foe
     }
   }
   if (!pick || (needsRelease && nearest && Math.hypot(nearest.x-s.x,nearest.y-s.y)>release)) return false
+  if(previous) {previous.target=pick;previous.index=bestIndex}
+  else attackPicks.set(s,{target:pick,index:bestIndex})
   press.claims.set(pick, (press.claims.get(pick) ?? 0) + 1)
   const distance = Math.hypot(pick.x - s.x, pick.y - s.y)
   s.idle = false
@@ -999,14 +1036,19 @@ function attackLane(battle:Battle,s:Soldier,def:UnitDef,target:Soldier,reg:Regim
     if(!obstacle || obstacle.aliveCount<=0 || obstacle.bodySpeed>0.8) s.bypass=null
     else {
       const od=unitDef(obstacle.type),fx=Math.cos(obstacle.facing),fy=Math.sin(obstacle.facing)
-      let minR=Infinity,maxR=-Infinity,minL=Infinity,maxL=-Infinity
-      for(const body of obstacle.soldiers) {
-        if(!body.alive) continue
-        const dx=body.x-obstacle.anchorX,dy=body.y-obstacle.anchorY
-        const right=dx*fy-dy*fx,along=dx*fx+dy*fy
-        minR=Math.min(minR,right-od.radius);maxR=Math.max(maxR,right+od.radius)
-        minL=Math.min(minL,along-od.radius);maxL=Math.max(maxL,along+od.radius)
+      let bounds=press.lanes.get(obstacle)
+      if(!bounds) {
+        bounds={minR:Infinity,maxR:-Infinity,minL:Infinity,maxL:-Infinity}
+        for(const body of obstacle.soldiers) {
+          if(!body.alive) continue
+          const dx=body.x-obstacle.anchorX,dy=body.y-obstacle.anchorY
+          const right=dx*fy-dy*fx,along=dx*fx+dy*fy
+          bounds.minR=Math.min(bounds.minR,right-od.radius);bounds.maxR=Math.max(bounds.maxR,right+od.radius)
+          bounds.minL=Math.min(bounds.minL,along-od.radius);bounds.maxL=Math.max(bounds.maxL,along+od.radius)
+        }
+        press.lanes.set(obstacle,bounds)
       }
+      const {minR,maxR,minL,maxL}=bounds
       // Several parallel lanes keep a whole regiment from queueing at one corner.
       const pad=def.radius+0.55+(s.file%4)*(def.radius*2+0.2),route=s.bypass
       const selfR=(s.x-obstacle.anchorX)*fy-(s.y-obstacle.anchorY)*fx
@@ -1858,25 +1900,28 @@ function resolveImpact(battle: Battle, live: Live[], grid: Spatial, buf: number[
 function separate(live: Live[], pad: Scratch,dt:number): void {
   const buf = pad.buf
   const contactScratch={gap:0,nx:0,ny:0}
+  const shellRecovery=1-Math.exp(-MECHANICS.contactStiffness*dt/4)
   let largestRadius=0,largestAxisShift=0
   for(const item of live) {
-    largestRadius=Math.max(largestRadius,collisionRadius(item.def))
+    largestRadius=Math.max(largestRadius,collisionRadius(item.def,true))
     if(item.def.shape==='capsule') largestAxisShift=Math.max(largestAxisShift,(item.def.length/2-item.def.radius)*(1-MECHANICS.collisionRadiusScale))
   }
   const traction=new Set<Soldier>()
   const tractionKicks:{foot:Soldier;x:number;y:number}[]=[]
-  fillGrid(pad,live)
+  let tractionGridReady=false
   for(const cart of live) {
     if(cart.def.type!=='chariot'||cart.reg.routing||cart.s.down>0||cart.s.speed<0.02||cart.s.speed>=5||cart.s.plowLeft>0) continue
+    if(!tractionGridReady) {fillGrid(pad,live,false);tractionGridReady=true}
     let resistance=0
     const contacts:{item:Live;nx:number;ny:number}[]=[]
     pad.spatial.query(cart.s.x,cart.s.y,cart.def.length/2+2,buf)
     for(const index of buf) {
       const other=live[index]
       if(!other.s.alive||other.s.down>0||other.def.physicalSize>1||other.s.id===cart.s.id) continue
+      const friendly=other.reg.side===cart.reg.side
+      // Cart traction uses its calibrated rolling collider and force budget.
       const contact=bodyContact(cart.s,cart.def,other.s,other.def)
       if(contact.gap>0.3||contact.nx*Math.cos(cart.s.facing)+contact.ny*Math.sin(cart.s.facing)<0.1) continue
-      const friendly=other.reg.side===cart.reg.side
       const grip=friendly?0.4:isBracing(other.reg,other.def,cart.s.x,cart.s.y,other.s)?MECHANICS.braceGroundGrip:1
       const forwardLoad=contact.nx*Math.cos(cart.s.facing)+contact.ny*Math.sin(cart.s.facing)
       // Side contacts need to clear the lane, but do not present their entire
@@ -1903,13 +1948,13 @@ function separate(live: Live[], pad: Scratch,dt:number): void {
   }
   for (let pass = 0; pass < 4; pass++) {
     let overlaps = 0
-    const grid = fillGrid(pad, live)
+    const grid = fillGrid(pad, live,false)
     for (let i = 0; i < live.length; i++) {
       const a = live[i]
       if (!a.s.alive) continue
-      // Capsules insert all three circle centres into the grid. Only our own
-      // half-axis and the largest circle radius need to expand this query.
-      const extent=collisionExtent(a.def)
+      // Query for full-size hostile bodies as well as slim friendly bodies.
+      // Capsules insert all three visual circle centres into the shared grid.
+      const extent=collisionExtent(a.def,true)
       // The shared combat grid inserts visual capsule points; include the
       // largest radius generously enough to cover the shorter physical axis.
       grid.query(a.s.x, a.s.y, extent+largestRadius+MECHANICS.contactPadding+largestAxisShift, buf)
@@ -1917,23 +1962,27 @@ function separate(live: Live[], pad: Scratch,dt:number): void {
         if (j <= i) continue
         const b = live[j]
         if (!b.s.alive) continue
-        const bound=collisionExtent(a.def)+collisionExtent(b.def)+MECHANICS.contactPadding
+        const enemy = a.reg.side !== b.reg.side
+        // Ordinary enemies do not grant the same pass-through room as allies.
+        // Carts retain the calibrated collider used by their explicit traction
+        // and ploughing rules; their force budget decides whether a lane opens.
+        const solidEnemy=enemy&&a.def.type!=='chariot'&&b.def.type!=='chariot'
+        const bound=collisionExtent(a.def,solidEnemy)+collisionExtent(b.def,solidEnemy)+MECHANICS.contactPadding
         const dx=b.s.x-a.s.x,dy=b.s.y-a.s.y
         if(dx*dx+dy*dy>=bound*bound) continue
-        const contact=bodyContact(a.s,a.def,b.s,b.def,contactScratch)
+        const contact=bodyContact(a.s,a.def,b.s,b.def,contactScratch,solidEnemy)
         const gap = contact.gap
         if (gap >= MECHANICS.contactPadding) continue
         overlaps++
-        if (pass === 0 && a.reg === b.reg) swapIfCrossing(a, b)
+        if (pass === 0 && a.reg === b.reg && !a.reg.routing) swapIfCrossing(a, b)
         const nx = contact.nx
         const ny = contact.ny
-        const enemy = a.reg.side !== b.reg.side
         let massA = enemy?collisionMass(a, b.s.x, b.s.y):a.def.mass
         let massB = enemy?collisionMass(b, a.s.x, a.s.y):b.def.mass
         const total = massA + massB
         const penetration=MECHANICS.contactPadding-gap
-        const softDepth=contactSoftDepth(collisionRadius(a.def)+collisionRadius(b.def),!enemy)
-        const push=contactPush(penetration,softDepth,dt)
+        const softDepth=contactSoftDepth(collisionRadius(a.def,solidEnemy)+collisionRadius(b.def,solidEnemy),!enemy)
+        const push=contactPush(penetration,softDepth,dt,shellRecovery)
         const firmness=clamp((penetration-softDepth*0.5)/Math.max(1e-6,softDepth*0.5),0,1)
         const plowA = enemy && a.def.type === 'chariot' && a.s.plowLeft > 0
         const plowB = enemy && b.def.type === 'chariot' && b.s.plowLeft > 0
@@ -2170,6 +2219,9 @@ function updateMorale(battle: Battle, dt: number): void {
       reg.destX=reg.anchorX; reg.destY=reg.anchorY; reg.order='hold'; reg.facingLocked=true; reg.targetId=null
       const enemy=nearestEnemyRegiment(battle,reg)
       reg.destFacing=enemy?Math.atan2(enemy.anchorY-center.y,enemy.anchorX-center.x):reg.facing
+      // Assign new places around the scattered survivors, without moving bodies.
+      reformAt(reg,reg.files,reg.destFacing)
+      reg.destX=reg.anchorX;reg.destY=reg.anchorY
       pushNotice(battle,`${reg.name}重整`)
     }
   }

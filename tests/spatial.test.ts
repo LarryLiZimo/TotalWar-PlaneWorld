@@ -1,5 +1,8 @@
 import {describe,expect,it} from 'vitest'
 import {Spatial} from '../src/sim/spatial'
+import {bodyContact} from '../src/sim/physics'
+import {unitDef} from '../src/sim/units'
+import type {Soldier,UnitDef} from '../src/sim/types'
 
 describe('spatial queries by army',()=> {
   it('preserves the unrestricted candidate order while filtering either army and deduplicating capsule points',()=> {
@@ -24,5 +27,13 @@ describe('spatial queries by army',()=> {
     grid.query(10,10,1,result,0);expect(result).toEqual([])
     grid.query(10,10,1,result,1);expect(result).toEqual([3])
     grid.query(10,10,1,result);expect(result).toEqual([3])
+  })
+})
+
+describe('circle collision fast path',()=> {
+  it.each([0,1e-9,1e-6,.4,2])('agrees with the same geometry represented as zero-axis capsules at separation %s',distance=> {
+    const circle=unitDef('sword'),capsule:UnitDef={...circle,shape:'capsule',length:circle.radius*2}
+    const a={id:1,x:10,y:10,facing:.7} as Soldier,b={id:2,x:10+distance,y:10+distance/2,facing:2.1} as Soldier
+    expect(bodyContact(a,circle,b,circle)).toEqual(bodyContact(a,capsule,b,capsule))
   })
 })

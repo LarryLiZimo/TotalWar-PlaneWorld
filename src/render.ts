@@ -8,6 +8,7 @@ import { MAP_HEIGHT, MAP_WIDTH } from './sim/types'
 import { isCavalry, unitDef } from './sim/units'
 import { FATIGUE, FATIGUE_NAMES } from './sim/mechanics'
 import { elevationAt } from './sim/terrain'
+import {spriteBatch,type SpriteBatch} from './sprite-batch'
 
 export interface RenderInput {
   battle: Battle
@@ -51,6 +52,8 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   // batching for thousands of bodies on high-DPI or simply larger windows.
   const cacheSprites=view.cacheSprites!==false
   if(cacheSprites) prepareGlyphs(battle,camera.zoom)
+  const requestedBatch=cacheSprites&&battle.regiments.reduce((n,r)=>n+r.aliveCount,0)>=256?spriteBatch(canvas):null
+  const batch=requestedBatch?.begin(width,height,glyphGeneration)?requestedBatch:null
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = '#141812'
   ctx.fillRect(0, 0, width, height)
@@ -124,6 +127,7 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   }
 
   for (const reg of battle.regiments) {
+    if(reg.routing) continue
     const selected = view.selection.includes(reg.id)
     const hovered = view.hoverId === reg.id
     if ((selected || view.showBoxes) && reg.aliveCount > 0) drawWeaponRange(ctx, camera, width, height, reg, selected)
@@ -133,8 +137,9 @@ export function render(canvas: HTMLCanvasElement, view: RenderInput): void {
   }
 
   for (const body of bodiesOf(battle)) {
-    drawSoldier(ctx, camera, width, height, body.reg, body.soldier, body.def, view.selection.includes(body.reg.id), view.alpha ?? 1, view.visualTime ?? battle.time, cacheSprites)
+    drawSoldier(ctx, camera, width, height, body.reg, body.soldier, body.def, view.selection.includes(body.reg.id), view.alpha ?? 1, view.visualTime ?? battle.time, cacheSprites,batch)
   }
+  batch?.flush(ctx)
 
   for (const projectile of battle.projectiles) {
     const ground = worldToScreen(camera, width, height, projectile.x, projectile.y)
@@ -368,11 +373,12 @@ const glyphTypes=new WeakMap<UnitDef,number>()
 const glyphStyles=new Map<UnitDef,{r:number;half:number}>()
 let nextGlyphType=0
 let spriteZoom=-1
+let glyphGeneration=0
 let spriteBattle:Battle|null=null
 let spriteCell=32,spriteColumns=32,spritePageSlots=1024,spriteLimit=8192
 function prepareGlyphs(battle:Battle,zoom:number):void {
   if(spriteZoom===zoom&&spriteBattle===battle) return
-  spriteZoom=zoom;spriteBattle=battle;footSprites.clear();glyphPages.length=0;glyphStyles.clear()
+  spriteZoom=zoom;spriteBattle=battle;glyphGeneration++;footSprites.clear();glyphPages.length=0;glyphStyles.clear()
   let half=16
   for(const reg of battle.regiments) {
     const def=unitDef(reg.type)
@@ -392,7 +398,7 @@ function prepareGlyphs(battle:Battle,zoom:number):void {
 }
 function drawSoldier(
   ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number,
-  reg: Regiment, soldier: Soldier, def:UnitDef, selected: boolean, alpha: number, time: number,cacheSprites:boolean,
+  reg: Regiment, soldier: Soldier, def:UnitDef, selected: boolean, alpha: number, time: number,cacheSprites:boolean,batch:SpriteBatch|null,
 ): void {
   const x=soldier.prevX+(soldier.x-soldier.prevX)*alpha,y=soldier.prevY+(soldier.y-soldier.prevY)*alpha
   const p=worldToScreen(camera,width,height,x,y)
@@ -413,6 +419,8 @@ function drawSoldier(
     if(!sprite) {
       let slot=footSprites.size
       if(slot>=spriteLimit) {
+        // An evicted atlas cell may still be referenced by a queued instance.
+        batch?.flush(ctx)
         const [oldKey,old]=footSprites.entries().next().value!;footSprites.delete(oldKey)
         sprite=old;slot=old.slot
       }
@@ -427,13 +435,18 @@ function drawSoldier(
       pen.clearRect(x,y,spriteCell,spriteCell);pen.save();pen.translate(x+spriteCell/2,y+spriteCell/2);pen.rotate(-sector*Math.PI*2/64)
       paintBody(pen,def,reg.side,r,camera.zoom,dead,soldier.wounded,flash,selected,foot,swing)
       pen.restore()
+      batch?.invalidate(page.canvas)
       footSprites.set(key,sprite)
     }
-    if(opacity!==1) ctx.globalAlpha=opacity
     const half=glyphStyles.get(def)!.half
-    ctx.drawImage(sprite.page,sprite.x+spriteCell/2-half,sprite.y+spriteCell/2-half,half*2,half*2,p.x-half,p.y-half,half*2,half*2)
-    if(opacity!==1) ctx.globalAlpha=1
+    if(batch) batch.draw(sprite.page,sprite.x+spriteCell/2-half,sprite.y+spriteCell/2-half,half*2,p.x-half,p.y-half,opacity)
+    else {
+      if(opacity!==1) ctx.globalAlpha=opacity
+      ctx.drawImage(sprite.page,sprite.x+spriteCell/2-half,sprite.y+spriteCell/2-half,half*2,half*2,p.x-half,p.y-half,half*2,half*2)
+      if(opacity!==1) ctx.globalAlpha=1
+    }
   } else {
+    batch?.flush(ctx)
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(-facing);ctx.globalAlpha=opacity
     paintBody(ctx,def,reg.side,r,camera.zoom,dead,soldier.wounded,flash,selected,stride,swingAngle)
     ctx.restore()
