@@ -1,7 +1,7 @@
 import { isBracing } from './formation'
 import { distPointToSegment } from './math'
 import type { Battle, OrderKind, Regiment } from './types'
-import { isCavalry, isInfantry, isRangedInfantry, unitDef } from './units'
+import { firesMissiles, isCavalry, isInfantry, isRangedInfantry, unitDef } from './units'
 
 export interface AiIntent {
   regId: number
@@ -40,12 +40,13 @@ function intent(reg: Regiment, kind: OrderKind, x: number, y: number, facing: nu
   return { regId: reg.id, sig, kind, x, y, facing, targetId }
 }
 
+/** Any braced player line near the path, whatever its category: isBracing already knows which units can brace. */
 function blockedByBrace(battle: Battle, from: Regiment, to: Regiment): boolean {
-  for (const infantry of standing(battle, 0).filter((reg) => isInfantry(reg.type))) {
-    if (!isBracing(infantry, unitDef(infantry.type), from.anchorX, from.anchorY)) continue
+  for (const line of standing(battle, 0)) {
+    if (!isBracing(line, unitDef(line.type), from.anchorX, from.anchorY)) continue
     const d = distPointToSegment(
-      infantry.anchorX,
-      infantry.anchorY,
+      line.anchorX,
+      line.anchorY,
       from.anchorX,
       from.anchorY,
       to.anchorX,
@@ -79,7 +80,7 @@ function decide(battle: Battle, reg: Regiment): AiIntent | null {
     return intent(reg, 'attack', foe.anchorX, foe.anchorY, facing, foe.id, `attack:${foe.id}`)
   }
 
-  if (unitDef(reg.type).missile) {
+  if (firesMissiles(reg)) {
     const missile = unitDef(reg.type).missile!
     const foe = nearest(reg, players)
     if (!foe) return null
@@ -93,9 +94,6 @@ function decide(battle: Battle, reg: Regiment): AiIntent | null {
     }
     const behindD = Math.hypot(reg.anchorX - behindX, reg.anchorY - behindY)
     const facing = Math.atan2(foe.anchorY - reg.anchorY, foe.anchorX - reg.anchorX)
-    if (distance < 22 && missile.arc) {
-      return intent(reg, 'attack', foe.anchorX, foe.anchorY, facing, foe.id, `kite:${foe.id}`)
-    }
     if (behindD > 6 && distance > 40) {
       return intent(reg, 'move', behindX, behindY, facing, null, `follow:${reg.type}:${Math.round(behindX / 2)}:${Math.round(behindY / 2)}`)
     }

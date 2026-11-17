@@ -1,7 +1,7 @@
 import { createEmptyBattle,spawn } from './battle'
-import { fileCount } from './formation'
+import { fileCount, formationLimits } from './formation'
 import type { Battle,Side,UnitType } from './types'
-import { unitDef } from './units'
+import { designModels, unitDef } from './units'
 
 export const ARMY_SCALES=[1,2,3,4,6,8] as const
 export type ArmyScale=typeof ARMY_SCALES[number]
@@ -23,13 +23,14 @@ export const DEFAULT_SETUP:ArmySetup={player:'classic',enemy:'advance',scale:4}
 
 export function unitModels(type:UnitType,scale:ArmyScale=4):number {
   const d=unitDef(type)
-  const standard=d.category==='monster'||d.models===1?0:d.standardModels??(d.category==='chariot'?4:d.category==='monstrousInfantry'?12:d.category==='cavalry'?60:d.category==='ranged'?68:120)
-  return standard?standard*scale/4:1
+  return d.category==='monster'||d.models===1?1:designModels(d)*scale/4
 }
 export function scaledFormation(type:UnitType,scale:ArmyScale):{models:number;files:number;hp:number} {
   const d=unitDef(type),models=unitModels(type,scale)
-  const ranks=d.category==='infantry'?6:d.category==='ranged'||d.category==='cavalry'?4:d.category==='monstrousInfantry'?2:1
-  return {models,files:fileCount(d,Math.ceil(models/ranks),models),hp:d.hp*(d.models===1?scale/4:1)}
+  // Deployment depth for the 4x size; larger regiments deepen by the same √ factor as their formation limits,
+  // so an 8x army deploys in the proportions of a 4x one.
+  const ranks=Math.round((d.category==='infantry'?6:d.category==='ranged'||d.category==='cavalry'?4:d.category==='monstrousInfantry'?2:1)*Math.sqrt(Math.max(1,models/designModels(d))))
+  return {models,files:fileCount(formationLimits(d,models),Math.ceil(models/ranks),models),hp:d.hp*(d.models===1?scale/4:1)}
 }
 export function armySummary(id:ArmyId,scale:ArmyScale) {
   return {regiments:ARMIES[id].units.reduce((n,[,count])=>n+count,0),models:ARMIES[id].units.reduce((n,[type,count])=>n+unitModels(type,scale)*count,0),budget:ARMIES[id].units.reduce((n,[type,count])=>n+unitDef(type).cost*count,0)}

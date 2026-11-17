@@ -1,7 +1,7 @@
 import { angDiff, clamp, forward, right } from './math'
 import type { Battle, Regiment, Soldier, UnitDef } from './types'
 import { MAP_HEIGHT, MAP_WIDTH } from './types'
-import { unitDef } from './units'
+import { designModels, unitDef } from './units'
 import { MECHANICS } from './mechanics'
 
 export interface Vec2 {
@@ -67,8 +67,26 @@ export function isBracing(reg: Regiment, def: UnitDef, towardX: number, towardY:
   return standing >= reg.aliveCount * MECHANICS.braceStillFraction && beforeFront(reg, def, towardX, towardY)
 }
 
+/**
+ * Whether a man holds his ground as a braced body against something at (towardX, towardY) (RULES 四.4, 四.7): his block
+ * has stood still for braceTime, he is not walking, and he faces it within 60°. Unlike isBracing this asks neither where
+ * the block's front is nor whether he himself was jostled: the men inside a standing block brace against a body that
+ * has broken in from the front even while comrades are thrown against them, but not against one that comes at their
+ * flank or back. It sets their collision and impact mass; charge defence and reflection still need isBracing.
+ */
+export function bracedAgainst(reg: Regiment, def: UnitDef, soldier: Soldier, towardX: number, towardY: number): boolean {
+  if (!def.canBrace || reg.routing || !soldier.alive || soldier.down > 0 || reg.stationaryTime < MECHANICS.braceTime || soldier.speed > 0.25) return false
+  return Math.abs(angDiff(soldier.facing, Math.atan2(towardY - soldier.y, towardX - soldier.x))) <= Math.PI / 3
+}
+
 export function chargeDefended(reg: Regiment, def: UnitDef, soldier: Soldier, attacker: UnitDef, x: number, y: number): boolean {
   return (def.chargeDefense === 'all' || (def.chargeDefense === 'large' && attacker.large)) && isBracing(reg,def,x,y,soldier)
+}
+
+/** Impact mass factor of a braced man (RULES 四.7): ×1 for a single rank, rising linearly to impactBraceMax at eight ranks. */
+export function impactBraceMultiplier(reg: Regiment): number {
+  const depth = Math.ceil(reg.aliveCount / Math.max(1, reg.files))
+  return 1 + (MECHANICS.impactBraceMax - 1) * clamp((depth - 1) / 7, 0, 1)
 }
 
 /** Local interpolation between one-rank and eight-rank support; coefficients are tunable. */
@@ -218,9 +236,26 @@ function formationSlots(
  * Files a unit of `alive` men can actually stand in: no wider than its type allows or than it has men,
  * and no narrower than its type's deepest column allows.
  */
-export function fileCount(def: UnitDef, files: number, alive: number): number {
-  const widest = Math.max(1, Math.min(alive, def.maxFiles))
-  const narrowest = Math.min(widest, Math.max(1, Math.ceil(alive / def.maxRanks)))
+/** Widest (files) and deepest (ranks) a regiment may stand. */
+export interface FormationLimits { maxFiles: number; maxRanks: number }
+
+/**
+ * The unit values are tuned for the 4x army scale. A larger regiment scales both by √(models / 4x models), so the
+ * same range of width-to-depth ratios stays open (an 8x infantry block is not forced six ranks deep); smaller ones
+ * keep the 4x values.
+ */
+export function formationLimits(def: UnitDef, deployed: number): FormationLimits {
+  const k = Math.sqrt(Math.max(1, deployed / designModels(def)))
+  return { maxFiles: Math.max(1, Math.round(def.maxFiles * k)), maxRanks: Math.max(1, Math.round(def.maxRanks * k)) }
+}
+
+export function regimentLimits(reg: Regiment): FormationLimits {
+  return formationLimits(unitDef(reg.type), reg.initial)
+}
+
+export function fileCount(limits: FormationLimits, files: number, alive: number): number {
+  const widest = Math.max(1, Math.min(alive, limits.maxFiles))
+  const narrowest = Math.min(widest, Math.max(1, Math.ceil(alive / limits.maxRanks)))
   return clamp(Math.round(files), narrowest, widest)
 }
 
@@ -231,7 +266,7 @@ export function assignFormation(reg: Regiment, files: number, ordered?: Soldier[
     return
   }
   const def = unitDef(reg.type)
-  files = fileCount(def, files, alive.length)
+  files = fileCount(regimentLimits(reg), files, alive.length)
   reg.files = files
   const slots = formationSlots(reg, def, files, alive.length)
   const cost = alive.map((soldier) => slots.map((slot) => (soldier.x - slot.x) ** 2 + (soldier.y - slot.y) ** 2))
@@ -329,7 +364,7 @@ export function reformAt(reg: Regiment, files: number, facing: number, x?: numbe
   }
   cx /= alive.length
   cy /= alive.length
-  const width = fileCount(def, files, alive.length)
+  const width = fileCount(regimentLimits(reg), files, alive.length)
   const depth = (Math.ceil(alive.length / width) - 1) * def.rankSpacing
   const fwd = forward(facing)
   reg.facing = facing
@@ -360,7 +395,7 @@ export function reformMoving(reg: Regiment, files: number, facing: number): void
   }
   cx /= alive.length
   cy /= alive.length
-  const width = fileCount(def, files, alive.length)
+  const width = fileCount(regimentLimits(reg), files, alive.length)
   const depth = (Math.ceil(alive.length / width) - 1) * def.rankSpacing
   reg.facing = facing
   reg.anchorX = cx + (fwd.x * depth) / 2
@@ -372,7 +407,7 @@ export function reformMoving(reg: Regiment, files: number, facing: number): void
 export function fitOnMap(reg: Regiment, x: number, y: number, facing: number, files: number): Vec2 {
   const def = unitDef(reg.type)
   const alive = Math.max(1, reg.aliveCount)
-  const width = fileCount(def, files, alive)
+  const width = fileCount(regimentLimits(reg), files, alive)
   const halfW = ((width - 1) * def.spacing) / 2 + def.radius + 0.5
   const depth = (Math.ceil(alive / width) - 1) * def.rankSpacing + def.radius + 0.5
   const fwd = forward(facing)
@@ -398,8 +433,10 @@ export function compactRanks(reg: Regiment): void {
   const alive=reg.soldiers.filter(s=>s.alive)
   if (!alive.length) return
   const def=unitDef(reg.type)
-  reg.files=fileCount(def,reg.files,alive.length)
-  reg.destFiles=fileCount(def,reg.destFiles,alive.length)
+  // Where each man's place is now, before the block is laid out again for the men left.
+  const held=alive.map(s=>slotOf(reg,def,s.file,s.rank,s.centerIndex))
+  reg.files=fileCount(regimentLimits(reg),reg.files,alive.length)
+  reg.destFiles=fileCount(regimentLimits(reg),reg.destFiles,alive.length)
   const slots=formationSlots(reg,def,reg.files,alive.length)
   const key=(s:{file:number;rank:number;centerIndex:number})=>`${s.rank}:${s.centerIndex<0?'f':'c'}:${s.centerIndex<0?s.file:s.centerIndex}`
   const occupied=new Map(alive.map(s=>[key(s),s]))
@@ -409,22 +446,36 @@ export function compactRanks(reg: Regiment): void {
     if (soldier && !kept.has(soldier)) kept.add(soldier)
     else holes.push(slot)
   }
-  // Fill from the front using the nearest remaining body. This propagates a
-  // vacancy through nearby ranks instead of sending a rear model through a
-  // stationary column. Quadratic matching avoids a cubic assignment each time
-  // one of 240 models dies; explicit formation changes keep exact assignment.
+  // Fill from the front with the man whose place is nearest: the man behind a gap steps up into it, and so on down
+  // the file, instead of a rear model being sent through a stationary column. Places are compared, not bodies: in a
+  // fight the front rank stands where it met the enemy, ragged and a step off its places, and matching bodies to
+  // places there hands a front-rank place to whoever happens to stand nearest the line on paper, leaving the man
+  // actually fighting in it with a place at the back he can never walk to. Quadratic matching avoids a cubic
+  // assignment each time one of 240 models dies; explicit formation changes keep exact assignment.
   if(holes.length) {
     const used=new Uint8Array(alive.length)
-    for(const slot of slots) {
+    const take=(i:number,slot:(typeof slots)[number])=> {
+      const s=alive[i];used[i]=1
+      s.file=slot.file;s.rank=slot.rank;s.centerIndex=slot.centerIndex;s.idle=false
+    }
+    // The full ranks, file by file from the front.
+    const full=slots.filter(slot=>slot.centerIndex<0),last=slots.filter(slot=>slot.centerIndex>=0)
+    for(const slot of full) {
       let best=-1,cost=Infinity
       for(let i=0;i<alive.length;i++) {
         if(used[i]) continue
-        const d=(alive[i].x-slot.x)**2+(alive[i].y-slot.y)**2
+        const d=(held[i].x-slot.x)**2+(held[i].y-slot.y)**2
         if(d<cost) {best=i;cost=d}
       }
-      const s=alive[best];used[best]=1
-      s.file=slot.file;s.rank=slot.rank;s.centerIndex=slot.centerIndex;s.idle=false
+      take(best,slot)
     }
+    // The short last rank stands centred, so its places shift sideways whenever its length changes. The men left for
+    // it keep their order from flank to flank: taking the nearest place one by one would hand every man his
+    // neighbour's and send the last of them the whole length of the rank.
+    const rgt=right(reg.facing)
+    const rest=alive.map((_,i)=>i).filter(i=>!used[i]).sort((a,b)=>(held[a].x-held[b].x)*rgt.x+(held[a].y-held[b].y)*rgt.y||alive[a].id-alive[b].id)
+    last.sort((a,b)=>a.centerIndex-b.centerIndex)
+    rest.forEach((i,k)=>take(i,last[k]))
   }
 }
 

@@ -16,16 +16,16 @@ export function unitPanelData(reg:Regiment,bracing=false) {
   }
   damage=count?damage/count:1;speed=count?speed/count:1
   const base=def.weaponBase*damage,ap=def.weaponAp*mods.ap*damage
-  const labels:Record<string,string>={base:'基础',casualties:'战损',position:'侧背',damaged:'受伤',winning:'占优',routingFriends:'友军溃逃',recentLosses:'近期损伤',encourage:'鼓舞',commander:'将军阵亡',armyLosses:'全军败势',fear:'恐惧',fatigue:'疲劳'}
+  const labels:Record<string,string>={base:'基础',casualties:'战损',recentLosses:'骤然减员',combat:'战况',friends:'友军在侧',enemies:'敌军逼近',flank:'侧面受击',rear:'背后受击',charged:'遭骑兵冲击',underFire:'遭远程打击',charging:'冲锋',routingFriends:'友军溃逃',encourage:'鼓舞',commander:'将军阵亡',fear:'恐惧',fatigue:'疲劳'}
   const reasons=Object.entries(reg.moraleFactors).filter(([,v])=>v!==0).map(([key,v])=>`${labels[key]??key} ${v>0?'+':''}${Math.round(v)}`).join(' · ')
   const rows:StatRow[]=[
     {key:'armor',label:'护甲',value:def.armor*mods.armor,max:200},
     {key:'leadership',label:'领导力',value:reg.leadership,max:100,hint:reasons},
-    {key:'speed',label:'速度',value:def.speed*mods.speed*speed,max:15,display:(def.speed*mods.speed*speed).toFixed(1),hint:'跑步速度（米/秒），已计入体力与负伤；地形和接触会进一步影响实际速度。'},
-    {key:'attack',label:'近战攻击',value:def.meleeAttack*mods.attack,max:100,hint:'已计入体力；对目标加成与短暂的冲锋加成在交战时另计。'},
+    {key:'speed',label:'速度',value:def.speed*mods.speed*speed,max:15,display:(def.speed*mods.speed*speed).toFixed(1),hint:'跑步速度（米/秒），已计入疲劳与负伤；接触会进一步影响实际速度。'},
+    {key:'attack',label:'近战攻击',value:def.meleeAttack*mods.attack,max:100,hint:'已计入疲劳；对目标加成与短暂的冲锋加成在交战时另计。'},
     {key:'defense',label:'近战防御',value:Math.max(0,def.meleeDefense*mods.defense-(reg.bogged?8:0)),max:100},
-    {key:'weapon',label:'武器威力',value:base+ap,max:150,hint:`普通 ${Math.round(base)} · 破甲 ${Math.round(ap)}；已计入体力与负伤。多模型负伤时显示存活模型均值。横条满刻度 150。`},
-    {key:'charge',label:'冲锋加成',value:def.chargeBonus*mods.charge,max:100,hint:'达到本兵种有效冲锋速度并接敌后，同时增加近攻和武器威力，13 秒线性衰减。无距离或队形门槛；适用的正面列阵冲锋防御可抵消。'},
+    {key:'weapon',label:'武器威力',value:base+ap,max:150,hint:`普通 ${Math.round(base)} · 破甲 ${Math.round(ap)}；已计入疲劳与负伤。多模型负伤时显示存活模型均值。横条满刻度 150。`},
+    {key:'charge',label:'冲锋加成',value:def.chargeBonus*mods.charge,max:100,hint:'达到本兵种有效冲锋速度并接敌后，同时增加近攻和武器威力，10 秒线性衰减；接敌当步立即带完整加成结算一击，没有前摇。无距离或队形门槛；适用的正面列阵冲锋防御可抵消。'},
   ]
   if(def.missile) rows.push(
     {key:'range',label:'射程',value:def.missile.range,max:200},
@@ -46,7 +46,7 @@ export function unitPanelData(reg:Regiment,bracing=false) {
   if(def.unbreakable) add('unbreakable','永不溃逃','不因领导力下降而溃逃。')
   if(def.commander) add('commander','将军','阵亡影响全军领导力。')
   if(def.encourage) add('encourage',`鼓舞 +${def.encourage}`,`在 ${MECHANICS.encourageRadius} 米内提供领导力。`)
-  if(def.collisionAttack) add('collision','碰撞攻击',`每 ${def.collisionAttack.interval} 秒，最多 ${def.collisionAttack.targets} 个目标。`)
+  if(def.collisionAttack) add('collision','碰撞攻击',`冲锋或攻击中以超过 5 米/秒撞上敌人时发动：每 ${def.collisionAttack.interval} 秒最多 ${def.collisionAttack.targets} 个目标，各受一次 ${def.collisionAttack.damage}× 武器威力的近战攻击。`)
   if(def.splash>1) add('splash',`溅射 ${def.splash}`,'一次挥击共享武器伤害的最大目标数。')
   if(def.wounds) add('wounds','负伤机制',`生命低于 ${Math.round(def.wounds.threshold*100)}% 时降低伤害与速度。`)
   for(const [key,label] of [['physical','物理抗性'],['missile','远程抗性'],['fire','火焰抗性'],['spell','法术抗性'],['ward','特保']] as const) {

@@ -1,21 +1,11 @@
 import { MECHANICS } from './mechanics'
-import type { Battle, Regiment } from './types'
+import type { Regiment } from './types'
 import { unitDef } from './units'
 
-/** A transparent local strength estimator; the original game's hidden evaluator
- * is not available. HP, combat quality and ammunition all contribute. */
-export function armyPressure(battle: Battle): [boolean, boolean] {
-  const initial=[0,0], current=[0,0]
-  for (const r of battle.regiments) {
-    const d=unitDef(r.type)
-    const quality=(d.meleeAttack+d.meleeDefense+d.armor*0.3+(d.weaponBase+d.weaponAp)*4/d.meleeInterval)/100
-    const max=r.initial*r.modelHp*quality
-    initial[r.side]+=max*(d.missile ? 1.5 : 1)
-    const hp=r.soldiers.reduce((sum,s)=>sum+(s.alive?s.hp:0),0)
-    const ammo=d.missile ? r.soldiers.reduce((sum,s)=>sum+(s.alive?s.ammo:0),0)/Math.max(1,r.aliveCount*d.missile.ammo) : 0
-    current[r.side]+=hp*quality*(d.missile ? 1+0.5*ammo : 1)*(r.routing?0.5:1)
-  }
-  return [0,1].map(side=>initial[side]>0 && current[side]<initial[side]*MECHANICS.armyLossesFraction && current[1-side]>current[side]*MECHANICS.armyLossesRatio) as [boolean,boolean]
+/** Whether a timer summed from fixed steps has run its delay. Repeated float addition falls just short
+ * (50 × 0.05 = 2.4999999999999990), which would otherwise cost a whole extra step. */
+export function reached(timer: number, delay: number): boolean {
+  return timer >= delay - 1e-6
 }
 
 export function advanceMorale(reg: Regiment, leadership: number, enemyNear: boolean, terrorHit: boolean, dt: number): 'routed' | 'shattered' | 'rallied' | null {
@@ -30,22 +20,30 @@ export function advanceMorale(reg: Regiment, leadership: number, enemyNear: bool
     reg.moraleState=leadership<10?'wavering':'steady'
     const def=unitDef(reg.type)
     const scared=terrorHit && !def.immunePsychology && !def.causesTerror && leadership<MECHANICS.terrorLeadership
-    if (leadership<=MECHANICS.shatterLeadership || reg.negativeTime>=MECHANICS.routDelay || scared) {
+    if (leadership<=MECHANICS.instantRoutLeadership || reached(reg.negativeTime,MECHANICS.routDelay) || scared) {
       reg.routCount++; reg.routing=true; reg.routeTime=0; reg.rallyTime=0; reg.negativeTime=0
-      reg.shattered=leadership<=MECHANICS.shatterLeadership || reg.routCount>=MECHANICS.shatterRouts
+      // Routing and shattering differ: a routed unit can rally and still counts on the field; the third rout shatters it.
+      reg.shattered=reg.routCount>=MECHANICS.shatterRouts
       reg.moraleState=reg.shattered?'shattered':'routing'
       return reg.shattered?'shattered':'routed'
     }
   } else {
+    // Safe time counts only in steps that start after the minimum rout is over, so 10 s + 8 s is 360 steps, not 359.
+    const minimumDone=reached(reg.routeTime,MECHANICS.minimumRout)
     reg.routeTime+=dt
-    if (leadership<=MECHANICS.shatterLeadership) { reg.shattered=true; reg.moraleState='shattered'; return 'shattered' }
     reg.moraleState='routing'
-    const safe=leadership>=0 && !enemyNear && !terrorHit && reg.routeTime>=MECHANICS.minimumRout
+    const safe=leadership>=0 && !enemyNear && !terrorHit && minimumDone
     reg.rallyTime=safe?reg.rallyTime+dt:0
-    if (reg.rallyTime>=MECHANICS.rallyDelay) {
+    if (reached(reg.rallyTime,MECHANICS.rallyDelay)) {
       reg.routing=false; reg.moraleState='steady'; reg.rallyTime=0; reg.routeTime=0
       return 'rallied'
     }
   }
   return null
+}
+
+/** Break a regiment for good, whatever its leadership: it routs now and never rallies. Its army has lost the battle. */
+export function shatter(reg: Regiment): void {
+  if (!reg.routing) { reg.routCount++; reg.routeTime=0 }
+  reg.routing=true; reg.shattered=true; reg.moraleState='shattered'; reg.rallyTime=0; reg.negativeTime=0
 }

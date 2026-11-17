@@ -38,7 +38,8 @@ function pair(distance=2) {
 describe('fear aura versus damage-triggered terror',()=> {
   it('proximity lowers leadership but cannot terror-rout an undamaged unit',()=> {
     const {b,source,victim}=pair(12);tick(b,0.25)
-    expect(victim.leadership).toBe(12)
+    // Base 20, the fear aura, and one enemy regiment close by.
+    expect(victim.leadership).toBe(20+MECHANICS.fearPenalty+MECHANICS.morale.enemyNear)
     expect(victim.moraleFactors.fear).toBe(MECHANICS.fearPenalty)
     expect(victim.taken).toHaveLength(0);expect(victim.routing).toBe(false)
     expect(source.terrorCooldown).toBe(0);expect(victim.terrorCooldown).toBe(0)
@@ -85,6 +86,8 @@ describe('fear aura versus damage-triggered terror',()=> {
     expect(victim.routing).toBe(true)
     const cooldown=source.terrorCooldown
     park(victim,220,190);park(reserve,130,102)
+    // A distant reserve: two monsters against one standing sword would otherwise be pushed past its losing mark first.
+    one(b,0,'sword',20,20)
     const second=one(b,1,'monster',130,100)
     const start=b.time
     tick(b,0.15)
@@ -102,6 +105,8 @@ describe('fear aura versus damage-triggered terror',()=> {
     source.terrorCooldown=0.05;source.soldiers[0].meleeCd=100
     step(b,0.05)
     expect(source.terrorCooldown).toBe(0);expect(reserve.routing).toBe(false)
+    // The monster's blow threw him clear (RULES 四.8), and a man on the ground cannot be hit: back on his feet, in reach.
+    park(reserve,100,102);reserve.soldiers[0].down=0
     source.soldiers[0].meleeCd=0;tick(b,0.15)
     expect(reserve.routing).toBe(true)
     expect(source.terrorCooldown).toBeGreaterThan(MECHANICS.terrorCooldown-0.2)
@@ -135,7 +140,8 @@ describe('fear aura versus damage-triggered terror',()=> {
   })
 
   it('causing fear grants fear immunity but still permits damage-triggered terror',()=> {
-    UNITS.sword={...UNITS.sword,causesFear:true}
+    // Without the fear penalty its leadership must start under the terror line for a hit to break it.
+    UNITS.sword={...UNITS.sword,causesFear:true,leadership:12}
     const {b,source,victim}=pair();tick(b,0.15)
     expect(victim.moraleFactors.fear).toBe(0)
     expect(victim.routing).toBe(true);expect(victim.terrorCooldown).toBe(0)

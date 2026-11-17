@@ -1,6 +1,7 @@
 {
-  "date": "2026-11-04T22:41:01.844Z",
+  "date": "2026-11-06T01:20:52.899Z",
   "node": "v22.15.1",
+  "code": "bundled sim (same plain bindings as the Worker build)",
   "scenarios": [
     {
       "scenario": "custom",
@@ -8,10 +9,10 @@
       "soldiers": 2840,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 39.31,
-      "p95Ms": 78.02,
-      "maxMs": 140.62,
-      "realtimeHeadroom": 1.27,
+      "meanMs": 11.16,
+      "p95Ms": 18.48,
+      "maxMs": 72.96,
+      "realtimeHeadroom": 4.48,
       "errors": []
     },
     {
@@ -20,10 +21,10 @@
       "soldiers": 1974,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 18.49,
-      "p95Ms": 31.89,
-      "maxMs": 65.51,
-      "realtimeHeadroom": 2.7,
+      "meanMs": 6.41,
+      "p95Ms": 8.53,
+      "maxMs": 27.27,
+      "realtimeHeadroom": 7.8,
       "errors": []
     },
     {
@@ -32,10 +33,10 @@
       "soldiers": 116,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 1.26,
-      "p95Ms": 2.49,
-      "maxMs": 4.65,
-      "realtimeHeadroom": 39.61,
+      "meanMs": 0.4,
+      "p95Ms": 0.85,
+      "maxMs": 1.52,
+      "realtimeHeadroom": 125.25,
       "errors": []
     },
     {
@@ -44,10 +45,10 @@
       "soldiers": 84,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 0.9,
-      "p95Ms": 1.63,
-      "maxMs": 3.32,
-      "realtimeHeadroom": 55.78,
+      "meanMs": 0.54,
+      "p95Ms": 1.09,
+      "maxMs": 3.23,
+      "realtimeHeadroom": 92.23,
       "errors": []
     },
     {
@@ -56,10 +57,10 @@
       "soldiers": 492,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 3.65,
-      "p95Ms": 7.82,
-      "maxMs": 12.78,
-      "realtimeHeadroom": 13.69,
+      "meanMs": 1.75,
+      "p95Ms": 2.72,
+      "maxMs": 9.11,
+      "realtimeHeadroom": 28.49,
       "errors": []
     },
     {
@@ -68,22 +69,10 @@
       "soldiers": 84,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 0.76,
-      "p95Ms": 1.4,
-      "maxMs": 2.45,
-      "realtimeHeadroom": 65.98,
-      "errors": []
-    },
-    {
-      "scenario": "hill",
-      "seed": 42,
-      "soldiers": 280,
-      "steps": 600,
-      "simulatedSeconds": 30,
-      "meanMs": 1.32,
-      "p95Ms": 2.39,
-      "maxMs": 3.48,
-      "realtimeHeadroom": 37.97,
+      "meanMs": 0.38,
+      "p95Ms": 0.72,
+      "maxMs": 1.69,
+      "realtimeHeadroom": 133,
       "errors": []
     },
     {
@@ -92,10 +81,10 @@
       "soldiers": 164,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 1.01,
-      "p95Ms": 1.81,
-      "maxMs": 5.23,
-      "realtimeHeadroom": 49.68,
+      "meanMs": 0.44,
+      "p95Ms": 0.62,
+      "maxMs": 1.62,
+      "realtimeHeadroom": 113.05,
       "errors": []
     },
     {
@@ -104,10 +93,10 @@
       "soldiers": 196,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 1.62,
-      "p95Ms": 2.91,
-      "maxMs": 5.57,
-      "realtimeHeadroom": 30.9,
+      "meanMs": 0.51,
+      "p95Ms": 0.65,
+      "maxMs": 1.6,
+      "realtimeHeadroom": 98.56,
       "errors": []
     },
     {
@@ -116,10 +105,10 @@
       "soldiers": 81,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 0.26,
-      "p95Ms": 0.45,
-      "maxMs": 1.84,
-      "realtimeHeadroom": 192.12,
+      "meanMs": 0.09,
+      "p95Ms": 0.15,
+      "maxMs": 1.48,
+      "realtimeHeadroom": 538.48,
       "errors": []
     },
     {
@@ -128,10 +117,10 @@
       "soldiers": 84,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 0.38,
-      "p95Ms": 0.74,
-      "maxMs": 3.64,
-      "realtimeHeadroom": 131.55,
+      "meanMs": 0.26,
+      "p95Ms": 0.75,
+      "maxMs": 2.17,
+      "realtimeHeadroom": 194.36,
       "errors": []
     },
     {
@@ -140,10 +129,10 @@
       "soldiers": 160,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 3.1,
-      "p95Ms": 5.5,
-      "maxMs": 8.84,
-      "realtimeHeadroom": 16.13,
+      "meanMs": 0.81,
+      "p95Ms": 1.04,
+      "maxMs": 3.07,
+      "realtimeHeadroom": 61.36,
       "errors": []
     },
     {
@@ -152,10 +141,46 @@
       "soldiers": 245,
       "steps": 600,
       "simulatedSeconds": 30,
-      "meanMs": 1.43,
-      "p95Ms": 3.31,
-      "maxMs": 5.37,
-      "realtimeHeadroom": 35.04,
+      "meanMs": 0.56,
+      "p95Ms": 1.44,
+      "maxMs": 2.15,
+      "realtimeHeadroom": 88.53,
+      "errors": []
+    },
+    {
+      "scenario": "warTrain-monstrousGuard",
+      "seed": 42,
+      "soldiers": 1270,
+      "steps": 600,
+      "simulatedSeconds": 30,
+      "meanMs": 4.09,
+      "p95Ms": 5.72,
+      "maxMs": 17.83,
+      "realtimeHeadroom": 12.24,
+      "errors": []
+    },
+    {
+      "scenario": "stateTroops-fanatics",
+      "seed": 42,
+      "soldiers": 2648,
+      "steps": 600,
+      "simulatedSeconds": 30,
+      "meanMs": 7.47,
+      "p95Ms": 9.96,
+      "maxMs": 39.08,
+      "realtimeHeadroom": 6.69,
+      "errors": []
+    },
+    {
+      "scenario": "blackpowder-knightly",
+      "seed": 42,
+      "soldiers": 2070,
+      "steps": 600,
+      "simulatedSeconds": 30,
+      "meanMs": 9.49,
+      "p95Ms": 13.99,
+      "maxMs": 25.71,
+      "realtimeHeadroom": 5.27,
       "errors": []
     }
   ]

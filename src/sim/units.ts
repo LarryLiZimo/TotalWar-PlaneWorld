@@ -1,4 +1,4 @@
-﻿import type { UnitDef, UnitType } from './types'
+﻿import type { Regiment, UnitDef, UnitType } from './types'
 
 const traits = {
   cost: 400, role: '常规近战',
@@ -70,14 +70,12 @@ const foot: Omit<UnitDef, 'type' | 'name' | 'antiLargeMa' | 'antiLargeWs' | 'ant
   pivotRate: 4,
   mass: 110,
   chargeBonus: 8,
-  impactPower: 0,
   canBrace: true,
   leadership: 75,
   radius: 0.32,
   length: 0.64,
   spacing: 0.85,
   rankSpacing: 0.72,
-  cleave: 0,
   large: false,
   shape: 'circle',
   missile: null,
@@ -105,13 +103,12 @@ const horse: Omit<UnitDef, 'type' | 'name' | 'speed' | 'chargeSpeed'> = {
   weaponAp: 16,
   meleeInterval: 4,
   reach: 0.75,
-  turnAccel: 2.6,
-  turnCap: 1.5,
-  turnRadius: 2,
-  pivotRate: 0.6,
+  turnAccel: 12,
+  turnCap: 3.2,
+  turnRadius: 1.2,
+  pivotRate: 2,
   mass: 1200,
   chargeBonus: 40,
-  impactPower: 34,
   antiLargeMa: 0,
   antiLargeWs: 0,
   antiInfantryMa: 0,
@@ -123,7 +120,6 @@ const horse: Omit<UnitDef, 'type' | 'name' | 'speed' | 'chargeSpeed'> = {
   length: 1.1,
   spacing: 1.35,
   rankSpacing: 1.5,
-  cleave: 1,
   large: true,
   shape: 'circle',
   missile: null,
@@ -214,7 +210,6 @@ const baseUnits = {
     pivotRate: 4,
     mass: 80,
     chargeBonus: 0,
-    impactPower: 0,
     antiLargeMa: 0,
     antiLargeWs: 0,
     antiInfantryMa: 0,
@@ -226,7 +221,6 @@ const baseUnits = {
     length: 0.64,
     spacing: 1.6,
     rankSpacing: 1.25,
-    cleave: 0,
     large: false,
     shape: 'circle',
     missile,
@@ -258,7 +252,6 @@ const baseUnits = {
     pivotRate: 4,
     mass: 90,
     chargeBonus: 0,
-    impactPower: 0,
     antiLargeMa: 0,
     antiLargeWs: 0,
     antiInfantryMa: 0,
@@ -270,7 +263,6 @@ const baseUnits = {
     length: 0.64,
     spacing: 1.05,
     rankSpacing: 1.05,
-    cleave: 0,
     large: false,
     shape: 'circle',
     missile: musketShot,
@@ -307,7 +299,6 @@ const baseUnits = {
     pivotRate: 0.3,
     mass: 2800,
     chargeBonus: 24,
-    impactPower: 38,
     antiLargeMa: 0,
     antiLargeWs: 0,
     antiInfantryMa: 0,
@@ -319,7 +310,6 @@ const baseUnits = {
     length: 3.4,
     spacing: 4,
     rankSpacing: 4,
-    cleave: 6,
     large: true,
     shape: 'capsule',
     missile: null,
@@ -352,13 +342,12 @@ const baseUnits = {
     reach: 0.8,
     speed: 5.8,
     chargeSpeed: 9.4,
-    turnAccel: 2.6,
-    turnCap: 1.5,
-    turnRadius: 2,
-    pivotRate: 0.6,
+    turnAccel: 12,
+    turnCap: 3.2,
+    turnRadius: 1.2,
+    pivotRate: 2,
     mass: 1500,
     chargeBonus: 48,
-    impactPower: 40,
     antiLargeMa: 0,
     antiLargeWs: 0,
     antiInfantryMa: 0,
@@ -370,7 +359,6 @@ const baseUnits = {
     length: 1.4,
     spacing: 1.35,
     rankSpacing: 1.5,
-    cleave: 1,
     large: true,
     shape: 'circle',
     missile: null,
@@ -405,7 +393,6 @@ const baseUnits = {
     pivotRate: 4,
     mass: 160,
     chargeBonus: 16,
-    impactPower: 0,
     antiLargeMa: 0,
     antiLargeWs: 0,
     antiInfantryMa: 0,
@@ -417,7 +404,6 @@ const baseUnits = {
     length: 0.9,
     spacing: 0.85,
     rankSpacing: 0.72,
-    cleave: 0,
     large: false,
     shape: 'circle',
     missile: null,
@@ -471,6 +457,8 @@ const baseUnits = {
   monster: {
     ...horse, type: 'monster', cost: 1700, role: '机动巨兽；恐惧与惊骇破线', name: '荒野巨兽', category: 'monster', weapon: 'claws',
     physicalSize: 4, bodyHeight: 5, penetrationResistance: 8,
+    // Monsters keep the old, slower horse turning; only cavalry got the tighter turn.
+    turnAccel: 2.6, turnCap: 1.5, turnRadius: 2, pivotRate: 0.6,
     attack: { windup: 0.8, recovery: 0.7, arc: 140, splashMaxSize: 2 },
     collisionAttack: { interval: 1.2, targets: 3, damage: 1 },
     wounds: singleWounds, causesFear: true, causesTerror: true,
@@ -478,11 +466,12 @@ const baseUnits = {
     meleeAttack: 42, meleeDefense: 24, armor: 45, weaponBase: 90, weaponAp: 180,
     meleeInterval: 4.8, splash: 6, reach: 1, speed: 4.6, chargeSpeed: 7,
     mass: 4800, radius: 1.5, length: 3, spacing: 3.5, rankSpacing: 3.5,
-    chargeBonus: 35, impactPower: 45, cleave: 2, leadership: 72,
+    chargeBonus: 35, leadership: 72,
   },
   behemoth: {
     ...horse, type: 'behemoth', cost: 2100, role: '重甲巨兽；耐打但慢，怕反大型破甲', name: '铁甲巨兽', category: 'monster', weapon: 'claws',
     physicalSize: 4, bodyHeight: 5.5, penetrationResistance: 10,
+    turnAccel: 2.6, turnCap: 1.5, turnRadius: 2, pivotRate: 0.6,
     attack: { windup: 0.9, recovery: 0.8, arc: 140, splashMaxSize: 2 },
     collisionAttack: { interval: 1.2, targets: 3, damage: 1 },
     wounds: singleWounds, causesFear: true, causesTerror: true,
@@ -490,7 +479,7 @@ const baseUnits = {
     meleeAttack: 38, meleeDefense: 34, armor: 110, weaponBase: 70, weaponAp: 190,
     meleeInterval: 5.2, splash: 5, reach: 1, speed: 3.6, chargeSpeed: 5.8,
     mass: 6000, radius: 1.6, length: 3.2, spacing: 3.5, rankSpacing: 3.5,
-    chargeBonus: 25, impactPower: 48, cleave: 2, leadership: 80,
+    chargeBonus: 25, leadership: 80,
   },
 } satisfies Partial<Record<UnitType, UnitDef>>
 
@@ -573,7 +562,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     role: '360°短程移动射击；高速骚扰，怕弓弩与近战',
     weapon: 'musket', hp: 150, armor: 20, leadership: 52,
     meleeAttack: 16, meleeDefense: 16, weaponBase: 10, weaponAp: 3,
-    chargeBonus: 10, impactPower: 18, speed: 7.8, chargeSpeed: 11.5,
+    chargeBonus: 10, speed: 7.8, chargeSpeed: 11.5,
     missile: { ...musketShot, base: 8, ap: 3, range: 40, reload: 7,
       ammo: 18, cone: 360, spread: 3, calibrationDistance: 35,
       calibrationRadius: 1.3, fireWhileMoving: true },
@@ -595,7 +584,6 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weaponBase: 20, weaponAp: 35, splash: 2, chargeBonus: 62,
     shieldBlock: 0.3, causesFear: true, mass: 1900, radius: 0.75, length: 1.5,
     spacing: 1.9, rankSpacing: 1.9, speed: 5.8, chargeSpeed: 9.4,
-    impactPower: 40, cleave: 2,
   },
   demigryphHalberd: {
     ...baseUnits.heavyCavalry, type: 'demigryphHalberd', name: '持戟半狮鹫', cost: 1650,
@@ -606,15 +594,15 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weaponBase: 12, weaponAp: 36, antiLargeMa: 20, antiLargeWs: 22,
     splash: 2, chargeBonus: 42, causesFear: true,
     mass: 1900, radius: 0.75, length: 1.5, spacing: 1.9, rankSpacing: 1.9,
-    speed: 5.8, chargeSpeed: 9.4, impactPower: 40, cleave: 2, reach: 1,
+    speed: 5.8, chargeSpeed: 9.4, reach: 1,
   },
   warWagon: {
     ...baseUnits.chariot, type: 'warWagon', name: '火枪战车', cost: 1100,
     role: '装甲移动火力平台；每车六名枪手齐射，近战较弱',
     weapon: 'musket', hp: 1200, armor: 80, leadership: 65,
     meleeAttack: 18, meleeDefense: 18, weaponBase: 12, weaponAp: 6,
-    speed: 5.2, chargeSpeed: 7.5, chargeBonus: 12, impactPower: 24,
-    collisionAttack: null, cleave: 3,
+    speed: 5.2, chargeSpeed: 7.5, chargeBonus: 12,
+    collisionAttack: { interval: 1, targets: 4, damage: 1 },
     missile: { ...musketShot, base: 3, ap: 12, reload: 8, range: 70,
       ammo: 20, cone: 360, fireWhileMoving: true, shotsPerVolley: 6 },
   },
@@ -623,7 +611,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     role: '重甲穿阵战车；冲撞更强，但慢且不易转向',
     hp: 1800, armor: 95, leadership: 72, meleeAttack: 26, meleeDefense: 18,
     weaponBase: 18, weaponAp: 18, speed: 5.2, chargeSpeed: 8.4,
-    mass: 3400, chargeBonus: 36, impactPower: 48,
+    mass: 3400, chargeBonus: 36,
     turnAccel: 2.5, turnCap: 1.3, turnRadius: 2.8,
   },
   ogreGreatWeapon: {
@@ -649,7 +637,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weaponBase: 140, weaponAp: 220, meleeInterval: 6, splash: 8,
     attack: { windup: 1.1, recovery: 0.9, arc: 145, splashMaxSize: 2 },
     bodyHeight: 6, mass: 6500, speed: 3.8, chargeSpeed: 6,
-    chargeBonus: 30, impactPower: 50, collisionAttack: null,
+    chargeBonus: 30, collisionAttack: { interval: 1.2, targets: 3, damage: 1 },
   },
   stoneBeast: {
     ...baseUnits.behemoth, type: 'stoneBeast', name: '磐石巨兽', cost: 2300,
@@ -692,4 +680,20 @@ export function isRangedInfantry(type: UnitType): boolean {
 
 export function isCavalry(type: UnitType): boolean {
   return UNITS[type].category === 'cavalry'
+}
+
+/** Models in a unit at the 4x army scale: the size its formation limits (maxFiles / maxRanks) are tuned for. */
+export function designModels(def: UnitDef): number {
+  if (def.category === 'monster' || def.models === 1) return 1
+  return def.standardModels ?? (def.category === 'chariot' ? 4 : def.category === 'monstrousInfantry' ? 12 : def.category === 'cavalry' ? 60 : def.category === 'ranged' ? 68 : 120)
+}
+
+/** A missile unit that is not switched to melee mode: it shoots, keeps its distance and does not charge in. */
+export function firesMissiles(reg: Pick<Regiment, 'type' | 'meleeMode'>): boolean {
+  return !!UNITS[reg.type].missile && !reg.meleeMode
+}
+
+/** A missile unit none of whose living models has a round left. It fights in melee mode (RULES 五.1). */
+export function outOfAmmo(reg: Pick<Regiment, 'type' | 'soldiers'>): boolean {
+  return !!UNITS[reg.type].missile && !reg.soldiers.some(s => s.alive && s.ammo > 0)
 }

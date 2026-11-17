@@ -14,5 +14,5 @@ export type WorkerRequest=
 export type WorkerReply=
  |{kind:'init';battle:BattleWire;frame:StateFrame}
  |{kind:'frame';frame:StateFrame}
- |{kind:'snapshot';requestId:number;snapshot:unknown}
+ |{kind:'snapshot';requestId:number;snapshot:unknown;pool:{size:number;reused:number}}
  |{kind:'error';message:string}

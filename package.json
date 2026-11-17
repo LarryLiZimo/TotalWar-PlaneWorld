@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:worker": "npm run build && node scripts/worker-check.mjs",
-    "test:regression": "vitest run tests/regressions.test.ts tests/mechanics.test.ts tests/terror.test.ts tests/grounding.test.ts tests/soft-contact.test.ts tests/input.test.ts tests/unit-panel.test.ts tests/armies.test.ts tests/transport.test.ts tests/charge.test.ts tests/rout-exit.test.ts tests/roster.test.ts",
+    "test:regression": "vitest run tests/regressions.test.ts tests/mechanics.test.ts tests/terror.test.ts tests/grounding.test.ts tests/soft-contact.test.ts tests/input.test.ts tests/unit-panel.test.ts tests/armies.test.ts tests/transport.test.ts tests/charge.test.ts tests/rout-exit.test.ts tests/roster.test.ts tests/enemy-line.test.ts tests/combat.test.ts tests/render.test.ts tests/spatial.test.ts tests/worker-loop.test.ts tests/frontend-fixes.test.ts tests/move-order.test.ts tests/sim-fixes.test.ts tests/contact-query.test.ts tests/power.test.ts tests/melee-mode.test.ts tests/order-queue.test.ts tests/formation-melee.test.ts tests/scene.test.ts tests/audio.test.ts tests/morale.test.ts",
     "bench": "node scripts/benchmark.mjs",
     "profile": "node scripts/profile.mjs",
     "balance": "node scripts/balance.mjs",

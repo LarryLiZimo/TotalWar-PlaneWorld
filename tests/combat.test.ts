@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { createBattle, step } from '../src/sim/battle'
 import {
+  CHARGE_DURATION,
+  casualtyPenalty,
   chargeDecay,
+  effectiveChargeSpeed,
   effectiveLeadership,
   hitChance,
-  impactRaw,
+  leadershipFactors,
   mitigate,
+  speedPower,
 } from '../src/sim/combat'
+import { MECHANICS } from '../src/sim/mechanics'
 import { assignFormation, isBracing, slotOf } from '../src/sim/formation'
 import { facingArc } from '../src/sim/math'
 import { clampFrontLine, commandAttack, commandMove } from '../src/sim/orders'
@@ -25,45 +30,76 @@ describe('combat formulas', () => {
     expect(mitigate(24, 8, 80, 0.8)).toBeCloseTo(16.64, 5)
   })
 
-  it('scales impact by mass, speed, and brace', () => {
-    expect(impactRaw(70, 5, 480, 110)).toBe(0)
-    expect(impactRaw(70, 13, 480, 110)).toBeCloseTo(80.09, 1)
-    expect(impactRaw(70, 13, 480, 110 * 3)).toBeLessThan(impactRaw(70, 13, 480, 110))
-    expect(impactRaw(70, 13, 110, 480)).toBeLessThan(impactRaw(70, 13, 480, 110))
+  it('judges every speed relative to the maximum: nothing below the threshold, then the ratio, capped at 1', () => {
+    const t = MECHANICS.speedThreshold
+    expect(speedPower(10 * (t - .01), 10)).toBe(0)
+    expect(speedPower(10 * t, 10)).toBeCloseTo(t, 12)
+    expect(speedPower(6, 10)).toBeCloseTo(.6, 12)
+    expect(speedPower(10, 10)).toBe(1)
+    expect(speedPower(25, 10)).toBe(1)
+    // Rounding just under the maximum still counts as full strength.
+    expect(speedPower(10 - 1e-12, 10)).toBe(1)
+    expect(speedPower(0, 10)).toBe(0)
+    expect(speedPower(-4, 10)).toBe(0)
+    expect(speedPower(5, 0)).toBe(0)
+    // The maximum is the charge speed after fatigue.
+    expect(effectiveChargeSpeed(UNITS.monster, 'fresh')).toBe(UNITS.monster.chargeSpeed)
+    expect(effectiveChargeSpeed(UNITS.monster, 'tired')).toBeCloseTo(UNITS.monster.chargeSpeed * .9, 12)
   })
 
-  it('decays charge bonus linearly over thirteen seconds', () => {
+  it('decays charge bonus linearly over ten seconds', () => {
+    expect(CHARGE_DURATION).toBe(10)
     expect(chargeDecay(0)).toBe(0)
     expect(chargeDecay(-3)).toBe(0)
-    expect(chargeDecay(6.5)).toBe(0.5)
+    expect(chargeDecay(2.5)).toBe(0.25)
+    expect(chargeDecay(5)).toBe(0.5)
+    expect(chargeDecay(10)).toBe(1)
     expect(chargeDecay(13)).toBe(1)
-    expect(chargeDecay(15)).toBe(1)
   })
 
-  it('keeps leadership above zero until losses and position stack', () => {
-    const leadership = effectiveLeadership({
-      base: 52,
-      initial: 60,
-      alive: 44,
-      flank: false,
-      rear: true,
-      recentDamage: true,
-      winning: false,
-      routingFriends: 0,
+  it('adds leadership up from casualties, sudden losses, the state of the fight and who stands where', () => {
+    const M = MECHANICS.morale
+    expect(effectiveLeadership({ base: 75, lost: 0 })).toBe(75)
+    // Casualties follow the curve: nothing for the first tenth, then steeper and steeper.
+    expect(casualtyPenalty(0.05)).toBe(0)
+    expect(casualtyPenalty(0.3)).toBe(-10)
+    expect(casualtyPenalty(0.4)).toBeCloseTo(-20)
+    expect(casualtyPenalty(0.5)).toBe(-30)
+    expect(casualtyPenalty(1)).toBe(-100)
+    expect(casualtyPenalty(0.5) - casualtyPenalty(0.3)).toBeLessThan(casualtyPenalty(0.3) - casualtyPenalty(0.1))
+    const worn = leadershipFactors({
+      base: 60, lost: 0.3, recentLoss: 0.06, dealt: 0.01, taken: 0.03, friends: 2, enemies: 1.5,
+      flank: true, rear: true, charged: 0.5, underFire: true, routingFriends: 3,
     })
-    expect(leadership).toBeCloseTo(3.667, 2)
-    expect(
-      effectiveLeadership({
-        base: 75,
-        initial: 80,
-        alive: 80,
-        flank: false,
-        rear: false,
-        recentDamage: false,
-        winning: false,
-        routingFriends: 0,
-      }),
-    ).toBe(75)
+    // 6 % lost in the window, 2 % of it free.
+    expect(worn.recentLosses).toBeCloseTo((0.06 - M.recentFree) * 100 * M.recentRate)
+    // Dealt a third of what it took: (1 - 3) / 4 = -0.5, of which combatEven counts as level.
+    expect(worn.combat).toBeCloseTo(M.losing * (0.5 - M.combatEven) / (1 - M.combatEven))
+    expect(worn.friends).toBe(2 * M.friendNear)
+    expect(worn.enemies).toBe(1.5 * M.enemyNear)
+    // Flank and rear are separate effects and both apply.
+    expect(worn.flank).toBe(M.flank)
+    expect(worn.rear).toBe(M.rear)
+    expect(worn.rear).toBeLessThan(worn.flank)
+    expect(worn.charged).toBe(M.chargedByMounted * 0.5)
+    expect(worn.underFire).toBe(M.underFire)
+    expect(worn.routingFriends).toBe(M.routingFriendMax)
+    expect(worn.charging).toBe(0)
+    expect(Object.values(worn).reduce((sum, value) => sum + value, 0)).toBeCloseTo(effectiveLeadership({
+      base: 60, lost: 0.3, recentLoss: 0.06, dealt: 0.01, taken: 0.03, friends: 2, enemies: 1.5,
+      flank: true, rear: true, charged: 0.5, underFire: true, routingFriends: 3,
+    }))
+    // The mirror image of that fight is winning it; charging adds its own.
+    const bold = leadershipFactors({ base: 60, lost: 0, dealt: 0.03, taken: 0.01, charging: 1, friends: 9, enemies: 9 })
+    expect(bold.combat).toBeCloseTo(M.winning * (0.5 - M.combatEven) / (1 - M.combatEven))
+    expect(bold.charging).toBe(M.charging)
+    expect(bold.friends).toBe(M.friendMax)
+    expect(bold.enemies).toBe(M.enemyMax)
+    // A few stray blows are no fight, and a level one moves nobody.
+    expect(leadershipFactors({ base: 60, lost: 0, dealt: 0, taken: M.combatFloor / 2 }).combat).toBe(0)
+    expect(leadershipFactors({ base: 60, lost: 0, dealt: 0.02, taken: 0.022 }).combat).toBe(0)
+    expect(leadershipFactors({ base: 60, lost: 0, recentLoss: M.recentFree }).recentLosses).toBe(0)
+    expect(leadershipFactors({ base: 60, lost: 0, recentLoss: 0.9 }).recentLosses).toBe(M.recentMax)
   })
 
   it('reads front, flank, and rear from facing', () => {
@@ -153,21 +189,27 @@ describe('battle', () => {
     expect(totalHp(battle)).toBe(startHp)
   }, 25000)
 
-  it('isolates kinetic impact: a chariot throws infantry and drives through', () => {
-    const bonus = UNITS.chariot.chargeBonus
-    const contactAttack = UNITS.chariot.collisionAttack
-    UNITS.chariot.chargeBonus = 0
-    UNITS.chariot.collisionAttack = null
+  it('isolates the ram: a chariot with no weapon and no collision attack throws infantry unhurt until its momentum is spent', () => {
+    const original = UNITS.chariot
+    UNITS.chariot = { ...original, chargeBonus: 0, weaponBase: 0, weaponAp: 0, collisionAttack: null }
     try {
       const run = chariotRearCharge()
       expect(run.flung).toBeGreaterThan(8)
+      // Rams deal no damage of their own (RULES 四.7).
       expect(run.infantry.aliveCount).toBe(80)
-      expect(run.worstOnHit).toBeGreaterThan(12)
-      expect(run.chariot.anchorY).toBeGreaterThan(run.infantry.anchorY + 4)
+      expect(run.worstOnHit).toBe(UNITS.spear.hp)
+      expect(run.infantry.soldiers.every(s => s.hp === UNITS.spear.hp)).toBe(true)
+      // Each man thrown takes momentum off it (RULES 四.7): it stops among the spears instead of driving out beyond them.
+      expect(run.farthest).toBeLessThan(run.infantry.anchorY + 4)
     } finally {
-      UNITS.chariot.chargeBonus = bonus
-      UNITS.chariot.collisionAttack = contactAttack
+      UNITS.chariot = original
     }
+  })
+
+  it('the same chariot charge with its collision attack hurts the men it runs into', () => {
+    const run = chariotRearCharge()
+    expect(run.flung).toBeGreaterThan(8)
+    expect(run.infantry.soldiers.some(s => !s.alive || s.hp < UNITS.spear.hp)).toBe(true)
   })
 
 
@@ -189,9 +231,11 @@ function chariotRearCharge() {
   commandAttack(battle, [chariot.id], infantry.id)
   let flung = 0
   let worstOnHit = 64
+  let farthest = chariot.anchorY
   const seenDown = new Set<number>()
   for (let i = 0; i < 20 * 12; i++) {
     step(battle, 0.05)
+    farthest = Math.max(farthest, chariot.anchorY)
     for (const soldier of infantry.soldiers) {
       if (soldier.down > 0 && !seenDown.has(soldier.id)) {
         seenDown.add(soldier.id)
@@ -200,7 +244,7 @@ function chariotRearCharge() {
       }
     }
   }
-  return { battle, chariot, infantry, flung, worstOnHit }
+  return { battle, chariot, infantry, flung, worstOnHit, farthest }
 }
 
 function dropRegiment(reg: ReturnType<typeof createBattle>['regiments'][number], x: number, y: number, facing: number): void {

@@ -9,32 +9,56 @@
   <body>
     <div id="app">
       <canvas id="view" tabindex="0"></canvas>
-      <header id="top" class="panel">
-        <strong>平原四兵</strong>
-        <span id="score"></span>
-        <span id="clock">00:00</span>
-        <button id="pause" type="button">暂停</button>
-        <button type="button" data-speed="0.5">0.5×</button>
-        <button type="button" data-speed="1" class="on">1×</button>
-        <button type="button" data-speed="2">2×</button>
-        <button type="button" data-speed="3">3×</button>
-        <button type="button" data-speed="5">5×</button>
-        <button id="ai" type="button">北军停止</button>
-        <button id="restart" type="button">再战</button>
-        <button id="army-setup" type="button">部队配置</button>
-        <select id="scenario" aria-label="测试场景"></select>
-        <button id="single-step" type="button" title="暂停并推进一个模拟步">单步</button>
-        <button id="snapshot" type="button">导出现场</button>
-        <button id="gait" type="button" aria-label="当前跑步" title="当前跑步；点击切换为走路（R）" disabled>»</button>
-        <button id="fire-at-will" type="button" disabled>自由射击</button>
-        <button id="skirmish" type="button" disabled>自动后撤</button>
-      </header>
+      <div id="topbar">
+        <header id="top" class="panel">
+          <strong class="title">平原四兵</strong>
+          <button id="pause" type="button">暂停</button>
+          <span class="speeds" role="group" aria-label="速度">
+            <button type="button" data-speed="0.5">0.5×</button>
+            <button type="button" data-speed="1" class="on">1×</button>
+            <button type="button" data-speed="2">2×</button>
+            <button type="button" data-speed="3">3×</button>
+            <button type="button" data-speed="5">5×</button>
+          </span>
+          <button id="restart" type="button">再战</button>
+          <button id="army-setup" type="button">部队配置</button>
+          <button id="sound" type="button" aria-pressed="true" title="开关音效（M）">音效 开</button>
+          <details id="tools">
+            <summary title="测试场景、单步与现场导出">调试</summary>
+            <div class="tools-body panel">
+              <label>场景<select id="scenario" aria-label="测试场景"></select></label>
+              <button id="ai" type="button">北军停止</button>
+              <button id="single-step" type="button" title="暂停并推进一个模拟步">单步</button>
+              <button id="snapshot" type="button">导出现场</button>
+            </div>
+          </details>
+        </header>
+        <section id="balance" class="panel" aria-label="战况">
+          <div id="power" role="meter" aria-label="实力对比（南军占比）" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <span id="power-south" class="power-label south">南军 50%</span>
+            <span class="power-track"><i id="power-fill"></i><b class="power-mark"></b><b class="power-mark mid" style="left:50%"></b><b class="power-mark"></b></span>
+            <span id="power-north" class="power-label north">50% 北军</span>
+          </div>
+          <div class="balance-line"><span id="score"></span><span id="clock">00:00</span></div>
+          <div id="outcome" hidden><strong id="outcome-text"></strong><button id="end-battle" type="button" class="on" title="停止战斗并查看结果；不点则可以继续追击">结束战斗</button></div>
+        </section>
+      </div>
       <aside id="side" class="panel">
         <section id="detail"></section>
       </aside>
-      <nav id="roster" class="panel" aria-label="南军兵牌"></nav>
+      <div id="command">
+        <div id="orders" class="panel" role="group" aria-label="部队指令">
+          <button id="gait" type="button" aria-label="当前跑步" title="当前跑步；点击切换为走路（R）" disabled>»</button>
+          <button id="fire-at-will" type="button" disabled>自由射击</button>
+          <button id="melee-mode" type="button" title="远程部队改为近战：停止射击，像近战部队一样接敌冲锋（F）" disabled>近战模式</button>
+          <details id="help">
+            <summary>操作说明</summary>
+            <p>左键选择，Ctrl+A 全选，右键地面移动，右键拖线拉正面，右键敌军攻击，按住 Shift 追加命令。按住 Alt / Ctrl 用左键或右键拖动，平移 / 旋转所选部队。拖两侧圆点改宽度。F 远程转近战，R 跑步 / 走路，P 暂停，M 音效，按住空格显示队形、射程、体力与部队名。WASD 平移，滚轮缩放。</p>
+          </details>
+        </div>
+        <nav id="roster" class="panel" aria-label="南军兵牌"></nav>
+      </div>
       <ul id="notices"></ul>
-      <p id="help">左键选择，右键地面移动，右键拖线拉正面，右键敌军攻击。拖两侧圆点改宽度。P 暂停，按住 Alt 显示全部队形，按住空格显示体力。WASD 平移，滚轮缩放。</p>
       <div id="banner" hidden></div>
       <dialog id="setup-dialog" class="panel">
         <form method="dialog" id="setup-form">

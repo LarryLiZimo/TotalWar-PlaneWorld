@@ -48,6 +48,8 @@ export type UnitType =
 export type OrderKind = 'hold' | 'move' | 'attack'
 export type Fatigue = 'fresh' | 'active' | 'winded' | 'tired' | 'veryTired' | 'exhausted'
 export type MoraleState = 'steady' | 'wavering' | 'routing' | 'shattered'
+/** 0 tiny, 1 on foot, 2 mounted, 3 monstrous infantry / chariot, 4 monster. Only bodies of size 1 or less can be
+ * knocked down, and only by a bigger body ramming them (RULES 四.7). */
 export type PhysicalSize = 0 | 1 | 2 | 3 | 4
 export interface AttackProfile {
   /** Start of a swing to the hit attempt; included within meleeInterval. */
@@ -57,11 +59,15 @@ export interface AttackProfile {
   arc: number
   splashMaxSize: PhysicalSize
 }
+/**
+ * Collision attack (RULES 四.7): the alternate melee attack a chariot or big monster makes on the enemies it runs into
+ * while charging or attacking. `interval` is its own cooldown in seconds, `targets` the most bodies one attack hits,
+ * and `damage` the multiple of the unit's weapon strength each of them takes.
+ */
 export interface CollisionAttackDef { interval: number; targets: number; damage: number }
 export interface WoundsDef { threshold: number; damage: number; speed: number }
 export interface Resistances { physical: number; missile: number; fire: number; spell: number; ward: number }
 export interface DamageTraits { magical?: boolean; flaming?: boolean; spell?: boolean }
-export interface Terrain { kind: 'flat' | 'slope'; rise: number; axis: 'x' | 'y' }
 
 export interface MissileDef {
   base: number
@@ -142,7 +148,6 @@ export interface UnitDef {
   pivotRate: number
   mass: number
   chargeBonus: number
-  impactPower: number
   antiLargeMa: number
   antiLargeWs: number
   /** Melee attack added against every small target, including ranged infantry. */
@@ -157,7 +162,6 @@ export interface UnitDef {
   length: number
   spacing: number
   rankSpacing: number
-  cleave: number
   large: boolean
   shape: 'circle' | 'capsule'
   missile: MissileDef | null
@@ -192,18 +196,36 @@ export interface Soldier {
   ammo: number
   disengage: number
   leaving: boolean
-  fleeX: number
-  fleeY: number
+  /** Enemy bodies this one has rammed; each must open a 2 m gap before it can be rammed again. */
   latched: number[]
-  cleave: number
   flash: number
   /** Seconds left on the ground. Zero means standing. */
   down: number
   /** Velocity of the throw, in m/s. It dies away while the soldier is down. */
   knockVx: number
   knockVy: number
+  /** Seconds left of the charge in progress, from CHARGE_DURATION at contact down to zero; no new charge meanwhile. */
   chargeLeft: number
+  /** Strength of that charge's bonus, min(1, closing speed / charge speed) at contact; 0 when charge defence negated it. */
+  chargePower: number
+  /** Charge intent only: alive, standing, running on an attack order, not routing, no charge in progress. Whether a
+   * charge happens, and how strong, is decided at contact against the enemy met. */
   chargeArmed: boolean
+  /** Seconds left for which the man he just rammed or threw down still counts as holding him in the line (RULES 三.3). */
+  impactHold: number
+  /** Seconds this model has been continuously within weapon reach of an enemy, and continuously out of reach. */
+  contactTime: number
+  freeTime: number
+  /** The regiment's orderSerial when this model was last within weapon reach of an enemy; -1 if never. */
+  contactOrder: number
+  /**
+   * Whether the contact this model is in may still deliver a charge (RULES 四.3). Decided when contact begins: open on
+   * a model's first contact, or when its regiment has had a new order since its last contact and it has been out of
+   * reach for MECHANICS.rechargeGap (cycle charging, even while comrades are still fighting). Closed once the contact
+   * lasts longer than MECHANICS.chargeEntryWindow. Drifting out of a melee and back in under the same order never
+   * charges again.
+   */
+  chargeOpen: boolean
   reactTo: number | null
   reactTime: number
   prevX: number
@@ -214,22 +236,25 @@ export interface Soldier {
   collisionCd: number
   braceTime: number
   wounded: boolean
-  /** Each chariot finishes its own straight run before turning for another pass. */
+  /** Ploughing after a ram (RULES 四.7): time left to throw the next man; a chariot also drives on toward plowX/plowY. */
   plowLeft: number
   plowX: number
   plowY: number
+  /** A chariot whose plough ran out of momentum among enemies is stuck there: it pushes nobody over until it is clear. */
+  chargeSpent: boolean
   /** External velocity is independent of walking and dissipates through ground friction. */
   pushVx: number
   pushVy: number
-  blockedTime: number
+  /** Which side this man passes allied files on while weaving through them; 0 until he first has to choose. */
   avoidSide: number
-  bypass: { regId:number; side:number; direction:number; passing:boolean } | null
   cartPath: { goalX:number; goalY:number; side:number; radius:number; arcLeft:number; straight:number } | null
 }
 
 export interface DamageEvent {
   t: number
   v: number
+  /** Dealt in melee (collision attacks included) rather than by a missile. */
+  melee: boolean
 }
 
 export interface Regiment {
@@ -248,15 +273,18 @@ export interface Regiment {
   destFacing: number
   /** Width the regiment forms up in once it reaches its destination. */
   destFiles: number
-  facingLocked: boolean
   targetId: number | null
   exertion: number
   fatigue: Fatigue
-  restTime: number
   run: boolean
   fireAtWill: boolean
-  skirmish: boolean
-  skirmishing: boolean
+  /** A missile unit switched to fight as melee (F): it holds fire, closes in and charges like melee troops. */
+  meleeMode: boolean
+  /**
+   * Shift-queued orders, started one after another when the current march reaches its spot or the current attack
+   * target is destroyed or routs. Any unqueued order, a march halted by an attack, and a rout clear it.
+   */
+  queue: QueuedOrder[]
   wantCharge: boolean
   anchorSpeed: number
   turnRate: number
@@ -285,21 +313,45 @@ export interface Regiment {
   dealt: DamageEvent[]
   taken: DamageEvent[]
   inContact: boolean
-  touchFlank: boolean
-  touchRear: boolean
+  /**
+   * Seconds left of each passing leadership effect (RULES 七.1): an enemy regiment fighting this one from beside it or
+   * from behind it, enemy missiles hitting it, and cavalry or chariots having charged into it on foot.
+   */
+  flankHold: number
+  rearHold: number
+  fireHold: number
+  chargedHold: number
+  /** Men of this regiment with an enemy at weapon's reach beside its block, and behind it, in this step's contact pass. */
+  flankTouch: number
+  rearTouch: number
+  /** Men on foot of this regiment whom cavalry or chariots charged home into in this step, and whose charge defence stopped one. */
+  shockHits: number
+  stoppedHits: number
   shot: boolean
   engaged: boolean
-  /** Briefly hold the melee frame after a cavalry impact knocks its target down. */
-  contactLock: number
   /** Ignore old melee reactions while carrying out a changed attack target. */
   retargeting: boolean
-  /** Reserves join a battle already reached by any member, even outside release range. */
-  attackCommitted: boolean
+  /** Ids of the enemy regiments some model of this one had within weapon reach in the last step's contact pass. */
+  meleeFoes: number[]
+  /** Some man found an enemy body within his reach + 0.5 m in this step's movement contact search (diagnostic probe of that search). */
   nearEnemy: boolean
-  /** Legacy regiment-level damage marker; individual reaction controls facing. */
-  meleeReact: boolean
-  /** Last regiment to land a rear melee blow, retained for diagnostics. */
-  rearFoe: number | null
+  /**
+   * This move was ordered while the regiment was in melee, so it is a disengagement: enemy attacks do not cancel it
+   * at all until it arrives (being blocked can still end it).
+   */
+  disengaging: boolean
+  /** Counts the orders this regiment has received; a new one lets its models charge again after pulling out. */
+  orderSerial: number
+  /** On a melee attack and within charging distance of the target (RULES 四.3): set each step with the attack destination. */
+  inChargeRange: boolean
+  /** 0..1: how far the files of a charging line have run out of line with each other (RULES 三.2). */
+  ragged: number
+  /**
+   * Seconds this move has spent in enemy contact without getting closer to its destination, and the closest it
+   * has come meanwhile (mean metres from the destination slots; -1 until the march first meets an enemy).
+   */
+  stall: number
+  stallGap: number
   moraleState: MoraleState
   shattered: boolean
   negativeTime: number
@@ -336,7 +388,6 @@ export interface Projectile {
   z: number
   vz: number
   gravity: number
-  sourceGround: number
   penetrationLeft: number
   hitIds: number[]
 }
@@ -364,6 +415,21 @@ export interface PendingOrder {
   targetId: number | null
 }
 
+/** One step of a Shift-queued order chain: a march to a spot (with a width for queued fronts) or an attack. */
+export type QueuedOrder =
+  | { kind: 'move'; x: number; y: number; facing: number; files?: number }
+  | { kind: 'attack'; targetId: number }
+
+/** Battlefield value (实力) of each army, index = side; see power.ts. */
+export interface ArmyPower {
+  /** Sum of regiment value over units still on the field and not shattered (routing units count: they can rally). */
+  value: [number, number]
+  /** The same sum at full health and ammunition: what the army deployed. */
+  max: [number, number]
+  /** The army is past its mark on the power bar: it has lost the battle (battle.ts decideBattle). */
+  losing: [boolean, boolean]
+}
+
 export interface Battle {
   /** Present only on a main-thread view; commands are executed by the worker. */
   sendCommand?: (command:BattleCommand)=>void
@@ -375,11 +441,12 @@ export interface Battle {
   fx: Floater[]
   notices: Notice[]
   winner: Side | -1 | null
+  /** Refreshed at the end of every step, where the battle is decided on it; all zeros until the first step. */
+  power: ArmyPower
   nextId: number
   pending: PendingOrder[]
   appliedSig: Map<number, string>
   widthOrder: Map<number, number[]>
   soldierById: Map<number, Soldier>
   aiEnabled: boolean
-  terrain: Terrain
 }

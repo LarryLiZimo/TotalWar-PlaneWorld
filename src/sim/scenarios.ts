@@ -14,15 +14,14 @@ export const SCENARIOS = {
   flank: '侧背受击转身',
   duel: '单体与步兵',
   roster: '扩展兵种会战',
-  collision: '低速碰撞攻击',
+  collision: '巨兽碰撞攻击',
   wounds: '单体负伤对照',
   morale: '惊骇与将军阵亡',
-  hill: '高低地与弹道',
   cartturn: '战车散阵转攻',
   cavturn: '骑兵近战转攻',
   reform: '减员补位',
   cartescape: '战车低速挤出',
-  reserves: '散兵补入战斗',
+  reserves: '散兵归队',
   friendlypass: '友军穿行与柔性碰撞',
 } as const
 export type Scenario = keyof typeof SCENARIOS
@@ -97,10 +96,10 @@ export function createScenario(name: Scenario, seed = 20261104): Battle {
     const target = add(1, 'sword', 150, 120)
     commandAttack(b, [hero.id], target.id)
   } else if (name === 'collision') {
-    const cart=add(0,'chariot',150,112,north)
-    const target=add(1,'sword',150,115,south)
-    cart.bogged=true
-    commandAttack(b,[cart.id],target.id)
+    // A monster runs into the front of a sword block: its collision attack and the men it knocks down.
+    const beast=add(0,'monster',150,80,north)
+    const target=add(1,'sword',150,120,south)
+    commandAttack(b,[beast.id],target.id)
   } else if (name === 'wounds') {
     const healthy=add(0,'inquisitor',110,85), wounded=add(0,'inquisitor',180,85)
     wounded.soldiers[0].hp*=0.2
@@ -110,15 +109,12 @@ export function createScenario(name: Scenario, seed = 20261104): Battle {
     const commander=add(0,'general',140,70)
     commander.soldiers[0].alive=false; commander.soldiers[0].hp=0; commander.soldiers[0].deathTime=0; commander.aliveCount=0
     const front=add(0,'sword',150,110)
-    front.soldiers.forEach(s=>{s.hp*=0.1})
-    add(0,'sword',60,50)
+    // Worn to just under half strength: with the general dead and the giant's fear it still holds, barely.
+    front.soldiers.forEach(s=>{s.hp*=0.45})
+    // Two whole reserves keep the army above its losing mark on the power bar, so only terror and the dead general act.
+    add(0,'sword',60,50); add(0,'sword',95,40)
     const giant=add(1,'monster',150,122)
     commandAttack(b,[giant.id],front.id)
-  } else if (name === 'hill') {
-    b.terrain={kind:'slope',rise:60,axis:'y'}
-    add(0,'archer',115,90); add(1,'archer',115,150)
-    const foot=add(0,'sword',180,80), enemy=add(1,'sword',180,160)
-    commandAttack(b,[foot.id],enemy.id)
   } else {
     const types: UnitType[] = ['halberd', 'shieldCavalry', 'crossbow', 'horseArcher', 'ogre', 'armoredOgre', 'monster', 'behemoth']
     types.forEach((type, i) => {

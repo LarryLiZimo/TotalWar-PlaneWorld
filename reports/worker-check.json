@@ -1,9 +1,13 @@
 {
-  "date": "2026-11-05T14:54:34.118Z",
-  "workerAsset": "battle.worker-wgK7qk1h.js",
+  "date": "2026-11-13T23:36:04.265Z",
+  "workerAsset": "battle.worker-N-gp8ge5.js",
   "scale": 8,
   "models": 3147,
-  "simulatedSeconds": 2.799999999999998,
+  "simulatedSeconds": 4.749999999999991,
+  "decided": {
+    "winner": 1,
+    "time": 35.050000000000146
+  },
   "checks": [
     "real worker init",
     "8x single health",
@@ -13,13 +17,14 @@
     "width change",
     "transfer and recycle",
     "authoritative snapshot",
-    "expanded roster 8x init and step"
+    "expanded roster 8x init and step",
+    "decisive frame at 5x"
   ],
   "errors": [],
   "mainHeartbeat": {
     "intervalMs": 10,
-    "samples": 77,
-    "p95Ms": 20.29939999999999,
-    "maxMs": 22.610200000000077
+    "samples": 79,
+    "p95Ms": 23.832299999999805,
+    "maxMs": 25.726999999999975
   }
 }

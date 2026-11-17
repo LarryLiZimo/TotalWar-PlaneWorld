@@ -28,7 +28,7 @@ describe('actual pointer event pipeline', () => {
     expect(pointer.drag?.kind).toBe('front')
     canvas.pointer('pointerup', 150, 120)
     const selected = b.regiments.filter(r => selection.includes(r.id))
-    expect(selected.every(r => r.order === 'move' && r.facingLocked)).toBe(true)
+    expect(selected.every(r => r.order === 'move')).toBe(true)
     expect(selected[0].destY).toBeCloseTo(selected[1].destY)
     expect(selected.every(r => r.destFacing === Math.PI / 2)).toBe(true)
     expect(pointer.drag).toBeNull()

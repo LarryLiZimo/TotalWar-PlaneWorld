@@ -60,7 +60,9 @@ ${table(['名称','前摇秒','最短恢复秒','完整攻击角度','可群攻�
 
 ${table(['名称','4×列/排','最宽列','最深排','列距/排距','行进/冲锋','视觉半径/长度','友军移动半径/长度','物理体型','身高','质量','穿透阻力','可列阵'],units.map(d=>[d.name,`${scaledFormation(d.type,4).files}/${Math.ceil(unitModels(d.type,4)/scaledFormation(d.type,4).files)}`,d.maxFiles,d.maxRanks,`${d.spacing}/${d.rankSpacing}`,`${d.speed}/${d.chargeSpeed}`,`${d.radius}/${d.length}`,`${n(collisionRadius(d))}/${n(d.length*MECHANICS.collisionRadiusScale)}`,d.physicalSize,d.bodyHeight,d.mass,d.penetrationResistance,yes(d.canBrace)]))}
 
-表中较细移动尺寸用于友军通行；普通敌对身体使用完整视觉 / 战斗尺寸，不能挤过完整敌阵。战车牵引与碾压沿用其专用较细碰撞体。物理体型、身高、质量、穿透阻力分别配置。柔性层、友军通过与地面阻力见[身体接触](../RULES.md#4-碰撞柔性与地面阻力)，胶囊 / 圆柱与接触算法见[技术结构](../ARCHITECTURE.md#运动几何与战斗几何)。
+“最宽列 / 最深排”按 4× 人数配置；部署人数多于 4× 的部队两者都乘 √(部署人数 ÷ 4× 人数) 再取整，保持相同的宽深比例范围，默认部署排数也按同一系数加深，见[队形规则](../RULES.md#1-队形怎样形成与恢复)。
+
+表中较细移动尺寸用于友军通行；普通敌对身体使用完整视觉 / 战斗尺寸，不能挤过完整敌阵。战车牵引与碾压沿用其专用较细碰撞体。物理体型、身高、质量、穿透阻力分别配置；只有物理体型不超过 1 的身体会被冲撞撞倒，更大的只被推开（[碰撞规则](../RULES.md#7-动能冲撞碰撞攻击和击倒)）。柔性层、友军通过与地面阻力见[身体接触](../RULES.md#4-碰撞柔性与地面阻力)，胶囊 / 圆柱与接触算法见[技术结构](../ARCHITECTURE.md#运动几何与战斗几何)。
 
 ## 转向
 
@@ -72,7 +74,7 @@ ${table(['名称','最快度/秒','加速度度/秒²','转弯半径米','原地
 
 [返回单位目录](../UNITS.md)。本页列具体武器和弹药配置，射击条件、弹丸、盾牌和友伤见[射击规则](../RULES.md#五射击与弹丸)。
 
-威力分不破甲 / 破甲，装填单位秒，距离单位米，角度单位度。弹药按轮计，威力按单发计，“每轮弹丸”列为每次装填发出的弹丸数。穿透预算决定途中还能穿过多少身体阻力；“穿透后伤害”为继续飞行时保留的倍率；“反大型额伤”只作用于命中大型目标的弹丸。
+威力分不破甲 / 破甲，装填单位秒，距离单位米，角度单位度。弹药按轮计，全队打完后自动转为近战模式；威力按单发计，“每轮弹丸”列为每次装填发出的弹丸数。穿透预算决定途中还能穿过多少身体阻力；“穿透后伤害”为继续飞行时保留的倍率；“反大型额伤”只作用于命中大型目标的弹丸。
 
 ${table(['名称','不破甲/破甲','装填秒','射程米','射界度','弹药','弹速米/秒','角度散布','校准距离/半径米','反大型额伤','每轮弹丸','穿透预算','穿透后伤害','移动开火','弹道'],units.filter(d=>d.missile).map(d=>{const m=d.missile;return [d.name,`${m.base}/${m.ap}`,m.reload,m.range,m.cone,m.ammo,m.speed,`±${m.spread}°`,`${m.calibrationDistance}/${m.calibrationRadius}`,m.bonusVsLarge??0,m.shotsPerVolley??1,m.penetration,pct(m.penetrationDamage),yes(m.fireWhileMoving),m.arc?'弧线':'火枪']}))}
 
@@ -100,11 +102,11 @@ ${table(['单位',...ARMY_SCALES.map(s=>`${s}×生命`)],units.filter(d=>d.model
 
 [返回单位目录](../UNITS.md)。本页列能力归属和具体值，通用定义见 [RULES.md](../RULES.md)。反大型、冲锋防御和冲锋反制是独立属性，不能相互推导。
 
-动能列为碰撞威力 / 每轮人数；碰撞攻击列为间隔秒 / 目标数 / 武器倍率；负伤列为触发生命比例 / 剩余伤害倍率 / 剩余普通速度倍率。
+碰撞攻击列为间隔秒 / 每次最多目标数 / 武器倍率，冲锋或攻击中自己撞上敌人、迎面相对速度达到自身有效冲锋速度的 ${pct(MECHANICS.speedThreshold)}（[速度门槛](../RULES.md#3-冲锋何时生效)）时发动，伤害随速度比增加、以冲锋速度撞上时为满额，撞击伤害只来自它；动能冲撞本身不造成伤害，只按物理体型与质量推挤、击倒，没有单独的单位数值。负伤列为触发生命比例 / 剩余伤害倍率 / 剩余普通速度倍率。
 
-${table(['名称','冲锋防御','冲锋反制','动能碰撞威力/人数','碰撞攻击 间隔秒/人数/武器倍率','负伤阈值/伤害/常速','鼓舞','将军','恐惧','惊骇','免疫心理','永不溃逃','物/射/火/法/特抗性'],units.map(d=>[d.name,({none:'无',large:'抵御大型',all:'抵御全部'})[d.chargeDefense],yes(d.chargeReflection),`${d.impactPower}/${d.cleave}`,d.collisionAttack?`${d.collisionAttack.interval}/${d.collisionAttack.targets}/${d.collisionAttack.damage}`:'无',d.wounds?`${pct(d.wounds.threshold)}/${pct(d.wounds.damage)}/${pct(d.wounds.speed)}`:'无',d.encourage,yes(d.commander),yes(d.causesFear),yes(d.causesTerror),yes(d.immunePsychology),yes(d.unbreakable),[d.resistances.physical,d.resistances.missile,d.resistances.fire,d.resistances.spell,d.resistances.ward].map(pct).join("/")]))}
+${table(['名称','冲锋防御','冲锋反制','碰撞攻击 间隔秒/人数/武器倍率','负伤阈值/伤害/常速','鼓舞','将军','恐惧','惊骇','免疫心理','永不溃逃','物/射/火/法/特抗性'],units.map(d=>[d.name,({none:'无',large:'抵御大型',all:'抵御全部'})[d.chargeDefense],yes(d.chargeReflection),d.collisionAttack?`${d.collisionAttack.interval}/${d.collisionAttack.targets}/${d.collisionAttack.damage}`:'无',d.wounds?`${pct(d.wounds.threshold)}/${pct(d.wounds.damage)}/${pct(d.wounds.speed)}`:'无',d.encourage,yes(d.commander),yes(d.causesFear),yes(d.causesTerror),yes(d.immunePsychology),yes(d.unbreakable),[d.resistances.physical,d.resistances.missile,d.resistances.fire,d.resistances.spell,d.resistances.ward].map(pct).join("/")]))}
 
-冲锋防御与反制见[列阵规则](../RULES.md#4-站稳迎击冲锋防御与反制)，动能与独立碰撞攻击见[碰撞伤害](../RULES.md#7-动能冲撞碰撞攻击和击倒)，恐惧和来源惊骇冷却见[心理规则](../RULES.md#2-恐惧与惊骇分别是什么)，永久负伤见[负伤规则](../RULES.md#2-单体负伤)。
+冲锋防御与反制见[列阵规则](../RULES.md#4-站稳迎击冲锋防御与反制)，动能冲撞、碰撞攻击与击倒见[碰撞规则](../RULES.md#7-动能冲撞碰撞攻击和击倒)，恐惧和来源惊骇冷却见[心理规则](../RULES.md#2-恐惧与惊骇分别是什么)，永久负伤见[负伤规则](../RULES.md#2-单体负伤)。
 
 鞭笞者永不溃逃且免疫心理；黑玫瑰、磐石巨兽和战斗牧师免疫心理。磐石巨兽物理抗性 15%，战斗牧师 10%，其余抗性见表。战斗牧师只有既有鼓舞、近战和抗性，没有主动法术；现有内容仍没有完整法术、火焰弹药或不死族崩解系统。
 `,

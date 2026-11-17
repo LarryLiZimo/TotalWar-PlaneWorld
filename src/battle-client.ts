@@ -10,11 +10,14 @@ export class BattleClient {
   private current:Battle|null=null
   private snapshotId=0
   private disposed=false
+  private paused:boolean
+  private speed:number
   private snapshots=new Map<number,{resolve:(value:unknown)=>void;reject:(reason:Error)=>void;timer:ReturnType<typeof setTimeout>}>()
   ready=false
   limited=false
   stepMs=0
   constructor(source:BattleSource,paused:boolean,speed:number,private readonly onBattle:(battle:Battle)=>void,private readonly onSteps:(times:number[])=>void,private readonly onError:(message:string)=>void) {
+    this.paused=paused;this.speed=speed
     this.worker=new Worker(new URL('./sim/battle.worker.ts',import.meta.url),{type:'module'})
     this.history=new PoseHistory(data=>this.send({kind:'recycle',buffer:data.buffer as ArrayBuffer},[data.buffer as ArrayBuffer]))
     this.worker.onmessage=({data}:MessageEvent<WorkerReply>)=> {
@@ -44,12 +47,16 @@ export class BattleClient {
   }
   private send(message:WorkerRequest,transfer?:Transferable[]):void {if(!this.disposed)this.worker.postMessage(message,transfer??[])}
   get display():Battle|null {return this.shown}
-  control(paused:boolean,speed:number):void {this.history.rebase(speed);this.send({kind:'control',paused,speed})}
+  /** Always forwarded (the worker also pauses itself on an error); the display clock keeps running across the change. */
+  control(paused:boolean,speed:number):void {
+    if(paused!==this.paused||speed!==this.speed) this.history.setRate(speed)
+    this.paused=paused;this.speed=speed;this.send({kind:'control',paused,speed})
+  }
   command(command:BattleCommand):void {this.send({kind:'command',command})}
   singleStep():void {this.send({kind:'step'})}
   presentation(now:number,paused:boolean):{battle:Battle;time:number}|null {
     if(!this.shown) return null
-    return {battle:this.shown,time:this.history.sample(this.shown,now,paused||this.shown.winner!==null)}
+    return {battle:this.shown,time:this.history.sample(this.shown,now,paused)}
   }
   snapshot():Promise<unknown> {
     const requestId=++this.snapshotId

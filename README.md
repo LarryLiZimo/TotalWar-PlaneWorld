@@ -25,7 +25,7 @@ npm install
 npm run dev
 ```
 
-打开 http://127.0.0.1:5173/ 。从十套军队中选择双方预设与规模后开始，默认 4×。共享兵表共 39 种，完整数值见 [UNITS.md](UNITS.md)，帝国模板与取舍见 [ROSTER-DESIGN.md](ROSTER-DESIGN.md)。左键选择、右键移动或攻击、右键拖线设置战线；新命令默认跑步，R 切换走路。双击底部兵牌定位部队，P 暂停。完整操作见 [CONTROLS.md](CONTROLS.md)。
+打开 http://127.0.0.1:5173/ 。从十套军队中选择双方预设与规模后开始，默认 4×。共享兵表共 39 种，完整数值见 [UNITS.md](UNITS.md)，帝国模板与取舍见 [ROSTER-DESIGN.md](ROSTER-DESIGN.md)。左键选择、Ctrl + A 全选、右键移动或攻击、右键拖线设置战线，按住 Alt / Ctrl 用左键或右键拖动平移 / 旋转所选部队，按住 Shift 追加排队命令；新命令默认跑步，R 切换走路，F 让远程转为近战。按住空格显示队形、射程、部队名与双方各部队的疲劳，双击底部兵牌定位部队，滚轮可以一直拉近到看清单兵，P 暂停，M 开关音效。顶部实力条按造价折算双方剩余战场价值的占比，一方被压过刻度即战败、全军溃散，战斗继续到玩家点“结束战斗”，见[何时结束会战](RULES.md#2-何时结束会战)。完整操作见 [CONTROLS.md](CONTROLS.md)。
 
 ## 检查与迭代
 
@@ -34,7 +34,7 @@ npm run check               # 类型/构建、全部测试、生产 Worker、单
 npm run test:regression     # 既有问题与机制快速回归
 npm run test:watch          # 持续迭代
 npm run test:worker         # 真实 Worker 消息检查
-npm run bench              # 无界面性能报告
+npm run bench              # 无界面性能报告（计时打包后的模拟）
 npm run profile -- melee 90 # 采样第 90 秒之后的混战
 npm run balance            # 固定种子兵种对抗
 npm run docs:units         # 单位配置变更后生成资料

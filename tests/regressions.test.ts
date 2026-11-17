@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyBattle, spawn, step } from '../src/sim/battle'
-import { chargeDecay, defenseMultiplier } from '../src/sim/combat'
+import { CHARGE_DURATION, casualtyPenalty, chargeDecay, defenseMultiplier } from '../src/sim/combat'
 import { battleErrors, battleSnapshot } from '../src/sim/diagnostics'
 import { gapBetween } from '../src/sim/formation'
 import { angDiff } from '../src/sim/math'
+import { MECHANICS } from '../src/sim/mechanics'
 import { commandAttack, commandBehavior, commandFront, commandGroupFront, commandMove, previewGroupFront } from '../src/sim/orders'
 import { createScenario } from '../src/sim/scenarios'
 import { Spatial } from '../src/sim/spatial'
@@ -136,15 +137,25 @@ describe('contact regressions', () => {
   })
 
   it('repeating an attack on the same enemy does not release its melee lock or refresh charge',()=>{
+    // A running rider hits a smaller hero, so both the cavalry contact lock
+    // (from the ram) and the charge timer are actually running first.
     const b=createEmptyBattle(37),r=one(b,0,'shieldCavalry',100,99,Math.PI/2)
-    const target=one(b,1,'general',100,100,-Math.PI/2)
+    const target=one(b,1,'inquisitor',100,102,-Math.PI/2)
     target.soldiers[0].meleeCd=100
-    commandAttack(b,[r.id],target.id);tick(b,1)
+    commandAttack(b,[r.id],target.id)
+    Object.assign(r.soldiers[0],{speed:9.5,vy:9.5})
+    for (let i=0;i<40 && !(r.soldiers[0].impactHold>0 && r.soldiers[0].chargeLeft>0);i++) step(b,0.05)
+    tick(b,0.5)
+    const lock=r.soldiers[0].impactHold,charge=r.soldiers[0].chargeLeft
+    // Both timers are live and already below their initial values, so either
+    // clearing or re-arming them on the repeated order would be visible.
+    expect(lock).toBeGreaterThan(0);expect(lock).toBeLessThan(MECHANICS.impactContactHold-0.3)
+    expect(charge).toBeGreaterThan(0);expect(charge).toBeLessThan(CHARGE_DURATION-0.3)
     expect(r.engaged).toBe(true)
-    const charge=r.soldiers[0].chargeLeft
     commandAttack(b,[r.id],target.id);step(b,0.05)
     expect(r.engaged).toBe(true);expect(r.retargeting).toBe(false)
-    expect(r.soldiers[0].chargeLeft).toBeLessThanOrEqual(charge)
+    expect(r.soldiers[0].impactHold).toBeCloseTo(lock-0.05,6)
+    expect(r.soldiers[0].chargeLeft).toBeCloseTo(charge-0.05,6)
   })
 
   it('clipping the former enemy during a retarget does not restart its cavalry lock',()=>{
@@ -159,7 +170,7 @@ describe('contact regressions', () => {
     old.soldiers[0].meleeCd=next.soldiers[0].meleeCd=100
     step(b,0.05)
     expect(old.soldiers[0].down).toBeGreaterThan(0)
-    expect(r.contactLock).toBe(0)
+    expect(r.soldiers[0].impactHold).toBe(0)
     expect(r.engaged).toBe(false)
   })
 
@@ -196,11 +207,11 @@ describe('contact regressions', () => {
     target.soldiers[0].meleeCd = 100
     commandAttack(b, [rider.id], target.id)
     for (let i = 0; i < 240 && rider.soldiers[0].chargeLeft === 0; i++) step(b, 0.05)
-    expect(rider.soldiers[0].chargeLeft).toBeGreaterThan(12)
+    expect(rider.soldiers[0].chargeLeft).toBeGreaterThan(CHARGE_DURATION - 1)
     tick(b, 1)
-    expect(rider.soldiers[0].chargeLeft).toBeGreaterThan(10)
+    expect(rider.soldiers[0].chargeLeft).toBeGreaterThan(CHARGE_DURATION - 2)
     expect(rider.soldiers[0].speed).toBeLessThan(1)
-    expect(chargeDecay(6.5)).toBe(0.5)
+    expect(chargeDecay(CHARGE_DURATION / 2)).toBe(0.5)
     expect(chargeDecay(-1)).toBe(0)
     expect(defenseMultiplier(Math.PI/2)).toBe(0.6)
     expect(defenseMultiplier(Math.PI)).toBe(0.3)
@@ -226,7 +237,8 @@ describe('contact regressions', () => {
     one(b, 1, 'spear', 200, 170, 0)
     r.soldiers[0].hp *= 0.2
     step(b, 0.05)
-    expect(r.leadership).toBeCloseTo(UNITS.monster.leadership - 40)
+    expect(r.leadership).toBeCloseTo(UNITS.monster.leadership + casualtyPenalty(0.8))
+    expect(casualtyPenalty(0.8)).toBeLessThan(-40)
   })
 
   it('shares a hero swing budget across nearby enemies instead of multiplying its damage', () => {
@@ -260,7 +272,7 @@ describe('contact regressions', () => {
       const b = createEmptyBattle(1); b.rng = () => 0.1
       const rider = one(b, 0, 'heavyCavalry', 100,99,Math.PI/2)
       const spear = one(b, 1, 'spear', 100,100,facing)
-      rider.soldiers[0].chargeLeft = 13
+      Object.assign(rider.soldiers[0], { chargeLeft: CHARGE_DURATION, chargePower: 1 })
       spear.soldiers[0].meleeCd = 100
       spear.stationaryTime = 2
       spear.soldiers[0].braceTime = 2
@@ -277,7 +289,7 @@ describe('contact regressions', () => {
     let contacted = false, highestAfterContact = 0
     for (let i=0;i<240 && b.winner === null;i++) {
       step(b,0.05)
-      if (rider.contactLock > 0) contacted = true
+      if (rider.soldiers[0].impactHold > 0) contacted = true
       if (contacted && rider.engaged) highestAfterContact = Math.max(highestAfterContact,rider.anchorY)
     }
     expect(contacted).toBe(true)
@@ -310,8 +322,10 @@ describe('gait commands',()=>{
 
   it('switching to walking during a charge actually slows the moving body',()=>{
     const b=createEmptyBattle(38),r=one(b,0,'heavyCavalry',100,45,Math.PI/2)
-    const target=one(b,1,'general',100,180,-Math.PI/2)
+    // Close enough that the rider breaks into the charge after a few strides, far enough not to arrive in 8 s.
+    const target=one(b,1,'general',100,95,-Math.PI/2)
     commandAttack(b,[r.id],target.id);tick(b,5)
+    expect(r.wantCharge).toBe(true)
     expect(r.soldiers[0].speed).toBeGreaterThan(UNITS.heavyCavalry.speed)
     commandBehavior(b,[r.id],{run:false});tick(b,3)
     expect(r.wantCharge).toBe(false)
@@ -335,7 +349,7 @@ describe('missile regressions', () => {
   })
 
   function bullet(b: Battle, source: Regiment): Projectile {
-    return { x: 100, y: 60, vx: 0, vy: 95, base: 0, ap: 12, side: 0, sourceReg: source.id, shooterId: source.soldiers[0].id, traveled: 0, maxRange: 70, alive: true, arc: false, originX: 100, originY: 60, landX: 100, landY: 100, age: 0, duration: 1, apex: 0, z:1.2,vz:0,gravity:0,sourceGround:0,penetrationLeft:1,hitIds:[] }
+    return { x: 100, y: 60, vx: 0, vy: 95, base: 0, ap: 12, side: 0, sourceReg: source.id, shooterId: source.soldiers[0].id, traveled: 0, maxRange: 70, alive: true, arc: false, originX: 100, originY: 60, landX: 100, landY: 100, age: 0, duration: 1, apex: 0, z:1.2,vz:0,gravity:0,penetrationLeft:1,hitIds:[] }
   }
   it('ignores friends near the muzzle and can hit friends at the terminal point', () => {
     const b = createEmptyBattle(5)

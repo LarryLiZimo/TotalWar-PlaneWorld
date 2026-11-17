@@ -2,7 +2,7 @@ import {describe,expect,it} from 'vitest'
 import {createEmptyBattle,spawn,step} from '../src/sim/battle'
 import {battleErrors} from '../src/sim/diagnostics'
 import {commandMove} from '../src/sim/orders'
-import {slotOf} from '../src/sim/formation'
+import {gapBetween,slotOf} from '../src/sim/formation'
 import {UNITS} from '../src/sim/units'
 import type {Battle,Regiment,Side} from '../src/sim/types'
 
@@ -54,14 +54,28 @@ describe('enemy infantry lines block movement',()=> {
     expect(battleErrors(b)).toEqual([])
   })
   it('also blocks scattered routing infantry rather than letting their escape bypass the line',()=> {
-    const {b,walker,line}=fixture(1)
+    const {b,walker,line}=fixture(0)
     // A northern unit normally escapes north; a southern reserve keeps the
     // battle running while this individual meets a southern enemy line.
-    walker.side=1;line.side=0
+    walker.side=1
     spawn(b,0,'general','friendly reserve',25,25,0)
+    // Two enemy riders close behind outweigh the line's own repulsion, so the
+    // escape heading runs straight into the files instead of away from them.
+    for(const x of [98,102]) spawn(b,0,'general','chaser',x,90,Math.PI/2)
+    silence(b)
+    const s=walker.soldiers[0]
+    Object.assign(s,{y:97,prevY:97});walker.anchorY=97
     Object.assign(walker,{routing:true,shattered:true,moraleState:'shattered'})
-    tick(b,24)
-    expect(walker.soldiers[0].y).toBeLessThan(105)
+    // The rout may run round a flank of the line, but never between its files.
+    const xs=line.soldiers.map(o=>o.x),ys=line.soldiers.map(o=>o.y)
+    let inside=0,pressed=0
+    for(let i=0;i<480;i++) {
+      step(b,.05)
+      if(line.soldiers.some(o=>gapBetween(s,UNITS.sword,o,UNITS.sword)<.3)) pressed++
+      if(s.x>Math.min(...xs)&&s.x<Math.max(...xs)&&s.y>Math.min(...ys)&&s.y<Math.max(...ys)) inside++
+    }
+    expect(pressed).toBeGreaterThan(40)
+    expect(inside).toBe(0)
     expect(line.aliveCount).toBe(80)
     expect(battleErrors(b)).toEqual([])
   })

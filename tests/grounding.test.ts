@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyBattle, spawn, step } from '../src/sim/battle'
+import { scaledFormation } from '../src/sim/armies'
 import { battleErrors } from '../src/sim/diagnostics'
-import { compactRanks, slotOf } from '../src/sim/formation'
+import { compactRanks, gapBetween, slotOf } from '../src/sim/formation'
 import { angDiff } from '../src/sim/math'
 import { commandAttack, commandMove } from '../src/sim/orders'
 import type { Battle, Regiment, UnitType } from '../src/sim/types'
@@ -55,11 +56,12 @@ describe('rolling chariot manoeuvres and extraction',()=> {
     expect(Math.hypot(r.soldiers[0].x-goalX,r.soldiers[0].y-goalY)).toBeLessThan(1.2)
   })
 
-  it.each(['chariot','heavyChariot','warWagon'] as const)('extracts a slow %s through a few ordinary infantry without needing impact speed',type=> {
+  it.each(['chariot','heavyChariot','warWagon'] as const)('extracts a slow %s through a few ordinary infantry without needing ram speed',type=> {
     const b=createEmptyBattle(73),cart=one(b,0,type,100,100,0)
     const feet=[[102.2,99.1],[102.2,100],[102.2,100.9],[103,99.55],[103,100.45]].map(([x,y])=>one(b,1,'sword',x,y,0))
-    for(const s of cart.soldiers) s.ammo=0
-    cart.bogged=true;commandMove(b,[cart.id],125,100,null)
+    cart.fireAtWill=false
+    // Bogged as the simulation leaves it: two seconds held among the enemy.
+    cart.bogged=true;cart.bogTime=2;commandMove(b,[cart.id],125,100,null)
     let fastestInContact=0
     for(let i=0;i<160;i++) {step(b,0.05);if(cart.inContact) fastestInContact=Math.max(fastestInContact,cart.soldiers[0].speed)}
     expect(cart.soldiers[0].x).toBeGreaterThan(108)
@@ -107,7 +109,7 @@ describe('ground resistance',()=> {
   })
 })
 
-describe('committed reserves',()=> {
+describe('joining a fight: every man goes to his place in the ranks',()=> {
   it('a small detached group rejoins the fight instead of waiting for its old slots',()=> {
     const b=createEmptyBattle(78),r=spawn(b,0,'sword','reserve',150,100,Math.PI/2)
     const target=spawn(b,1,'spear','target',150,125,-Math.PI/2)
@@ -119,7 +121,8 @@ describe('committed reserves',()=> {
     expect(battleErrors(b)).toEqual([])
   })
 
-  it('rear attackers go around a stationary allied block and join their engaged comrades',()=> {
+  // The men behind used to walk round the ends of the allied block to reach the enemy one by one.
+  it('rear attackers walk through a stationary allied block to their places behind their engaged comrades; nobody goes round it',()=> {
     const b=createEmptyBattle(76)
     const attackers=spawn(b,0,'sword','attackers',150,90,Math.PI/2)
     const wall=spawn(b,0,'sword','wall',150,110,Math.PI/2)
@@ -129,11 +132,239 @@ describe('committed reserves',()=> {
       if(i<6) Object.assign(s,{x:145+i*0.85,y:123.9,prevX:145+i*0.85,prevY:123.9})
     }
     commandAttack(b,[attackers.id],target.id)
-    tick(b,32)
+    const half=(attackers.files-1)*UNITS.sword.spacing/2
+    let widest=0
+    for(let i=0;i<640;i++) {step(b,0.05);widest=Math.max(widest,...attackers.soldiers.filter(s=>s.alive).map(s=>Math.abs(s.x-150)))}
     const rear=attackers.soldiers.slice(6).filter(s=>s.alive)
     expect(rear.filter(s=>s.y>116).length).toBeGreaterThan(rear.length*0.65)
+    // They came straight through the block's files: nobody strayed beyond the regiment's own width to pass its ends.
+    expect(widest).toBeLessThan(half+1.5)
     const wallShift=wall.soldiers.reduce((sum,s)=>sum+Math.hypot(s.x-slotOf(wall,UNITS.sword,s.file,s.rank,s.centerIndex).x,s.y-slotOf(wall,UNITS.sword,s.file,s.rank,s.centerIndex).y),0)/wall.aliveCount
     expect(wallShift).toBeLessThan(1)
     expect(battleErrors(b)).toEqual([])
   },15000)
+
+  // Monstrous infantry used to circle a block that friendly infantry was already fighting: shoved just out of reach
+  // between blows, they counted as blocked and set off round the friendly block, which had wrapped the enemy. Now
+  // their line goes straight for the enemy, through the friendly foot, and its front rank fights among them.
+  const approaches=[['from behind the friendly block',150,80,Math.PI/2],['from the open flank',115,106,0]] as const
+  it.each((['ogre','armoredOgre','ogreGreatWeapon','ogreHalberd'] as UnitType[]).flatMap(type=>approaches.map(([way,x,y,f])=>[type,way,x,y,f] as const)))
+  ('%s ordered onto a block friendly infantry already fights reach it %s, in their ranks and without circling',(type,_way,x,y,facing)=> {
+    const b=createEmptyBattle(5)
+    const friend=spawn(b,0,'sword','friend',150,100,Math.PI/2),enemy=spawn(b,1,'sword','enemy',150,112,-Math.PI/2)
+    commandAttack(b,[friend.id],enemy.id);commandAttack(b,[enemy.id],friend.id)
+    tick(b,6)
+    expect(friend.inContact).toBe(true)
+    const ogres=spawn(b,0,type,'ogres',x,y,facing),start=b.time
+    commandAttack(b,[ogres.id],enemy.id)
+    const path=new Map<number,number>(),turn=new Map<number,number>()
+    let firstHit=Infinity
+    for(let i=0;i<600;i++) {
+      const before=ogres.soldiers.map(s=>({x:s.x,y:s.y,f:s.facing}))
+      step(b,0.05)
+      ogres.soldiers.forEach((s,k)=>{
+        if(!s.alive) return
+        path.set(s.id,(path.get(s.id)??0)+Math.hypot(s.x-before[k].x,s.y-before[k].y))
+        turn.set(s.id,(turn.get(s.id)??0)+s.facing-before[k].f)
+      })
+      if(firstHit===Infinity&&ogres.dealt.length) firstHit=b.time-start
+    }
+    const def=UNITS[type],standing=ogres.soldiers.filter(s=>s.alive)
+    const atFight=standing.filter(s=>enemy.soldiers.some(e=>e.alive&&gapBetween(s,def,e,UNITS.sword)<=def.reach+0.5))
+    expect(firstHit).toBeLessThan(10)
+    // The front rank is in the fight; the rank behind keeps its places behind it instead of working its way round to
+    // the enemy. (With a long weapon it may well reach an enemy from there.)
+    expect(atFight.filter(s=>s.rank===0).length).toBeGreaterThanOrEqual(4)
+    const astray=standing.filter(s=>s.rank>0).map(s=>{const p=slotOf(ogres,def,s.file,s.rank,s.centerIndex);return Math.hypot(p.x-s.x,p.y-s.y)})
+    expect(Math.max(0,...astray)).toBeLessThan(2.5)
+    // The approach is about 26-40 m; a full circuit of the melee would add some 60 m more.
+    expect(Math.max(...path.values())).toBeLessThan(60)
+    expect(Math.max(...[...turn.values()].map(v=>Math.abs(v)/(2*Math.PI)))).toBeLessThan(1.5)
+    expect(battleErrors(b)).toEqual([])
+  },20000)
+})
+
+describe('an enemy standing in the way of an attack takes it; nobody walks round it on his own',()=> {
+  const N=Math.PI/2,S=-Math.PI/2
+  const near=(s:{x:number;y:number},r:Regiment,d:number)=>r.soldiers.some(o=>o.alive&&Math.hypot(o.x-s.x,o.y-s.y)<d)
+  /** Demigryphs ordered onto ogres; a greatsword line stands at blockX, squarely in their path at 100, beside it at 82. */
+  const field=(seed:number,blockX:number,ogreX:number)=> {
+    const b=createEmptyBattle(seed)
+    const riders=spawn(b,0,'demigryph','riders',100,60,N,scaledFormation('demigryph',4))
+    const swords=spawn(b,1,'greatsword','swords',blockX,108,S,{...scaledFormation('greatsword',4),files:40})
+    const ogres=spawn(b,1,'armoredOgre','ogres',ogreX,126,S,scaledFormation('armoredOgre',4))
+    b.aiEnabled=false
+    commandAttack(b,[riders.id],ogres.id)
+    return {b,riders,swords,ogres}
+  }
+
+  // Under the old reserve rule every rider with no one in reach went for the ogres, so riders slipped round and through
+  // the swords one by one (7 and 18 of 32 here) while the rest fought on.
+  it.each([1,3])('a unit stopped by a line in front of its target fights that line until it breaks (seed %i)',seed=> {
+    const {b,riders,swords,ogres}=field(seed,100,100)
+    let onOgres=0
+    // Only the riders' front rank reaches the line, so breaking it takes about a minute.
+    for(let i=0;i<2400&&!swords.routing&&swords.aliveCount>0;i++) {
+      step(b,0.05)
+      onOgres=Math.max(onOgres,riders.soldiers.filter(s=>s.alive&&near(s,ogres,3)).length)
+    }
+    expect(swords.routing).toBe(true)
+    expect(onOgres).toBe(0)
+    // Then it carries out the order: the line rides on and its front rank closes with the ogres.
+    tick(b,20)
+    expect(riders.soldiers.filter(s=>s.alive&&near(s,ogres,3)).length).toBeGreaterThanOrEqual(riders.files)
+    expect(battleErrors(b)).toEqual([])
+  },60000)
+
+  // A line that cannot break keeps the fight going long enough to tell the rules apart: under the old rule riders slipped
+  // round and through it to the ogres within 20-25 s (1 and 7 here); now none do until gaps open in the line.
+  it.each([1,3])('riders stopped by a line that holds stay on it rather than slipping past to their target (seed %i)',seed=> {
+    const original=UNITS.greatsword
+    UNITS.greatsword={...original,unbreakable:true}
+    try {
+      const b=createEmptyBattle(seed)
+      const riders=spawn(b,0,'heavyCavalry','riders',100,60,N,scaledFormation('heavyCavalry',4))
+      spawn(b,1,'greatsword','swords',100,108,S,{...scaledFormation('greatsword',4),files:40})
+      const ogres=spawn(b,1,'armoredOgre','ogres',100,126,S,scaledFormation('armoredOgre',4))
+      b.aiEnabled=false
+      commandAttack(b,[riders.id],ogres.id)
+      let onOgres=0
+      for(let i=0;i<500;i++) {step(b,0.05);onOgres=Math.max(onOgres,riders.soldiers.filter(s=>s.alive&&near(s,ogres,3)).length)}
+      expect(onOgres).toBe(0)
+      expect(battleErrors(b)).toEqual([])
+    } finally { UNITS.greatsword=original }
+  },30000)
+
+  it('files whose way is clear ride on to the target; only the files barred by the line stay and fight it',()=> {
+    const {b,riders,swords,ogres}=field(1,82,108)
+    tick(b,25)
+    const alive=riders.soldiers.filter(s=>s.alive)
+    // Two of the eight files meet the end of the line; the others carry the attack home with their front rank (the
+    // file between the two enemies may have neither in reach).
+    expect(alive.filter(s=>near(s,ogres,3)).length).toBeGreaterThanOrEqual(5)
+    expect(alive.filter(s=>near(s,swords,2.6)).length).toBeLessThanOrEqual(9)
+    expect(riders.meleeFoes).toContain(ogres.id)
+    expect(battleErrors(b)).toEqual([])
+  },20000)
+})
+
+describe('horses turn about tightly',()=> {
+  const N=Math.PI/2,S=-Math.PI/2
+  // A horse at full charge reversed onto a foe behind it: it used to need 2.3 s and a loop some 7 m wide (light horse 10 m);
+  // now about 1.2 s and 4 m (light horse 5.8 m). What is left is mostly braking from full speed before the turn tightens.
+  it.each([['heavyCavalry',4.4,1.3],['lightCavalry',6.3,1.3]] as const)('%s at charge speed turns about within %d m and %d s',(type,width,seconds)=> {
+    const b=createEmptyBattle(1),rider=one(b,0,type,100,60,N)
+    commandAttack(b,[rider.id],one(b,1,'sword',100,225,S).id)
+    // It runs up at its running pace and breaks into the charge within charging distance of the target.
+    const s=rider.soldiers[0]
+    for(let i=0;i<800&&s.speed<UNITS[type].chargeSpeed-0.02;i++) step(b,0.05)
+    // A stride more to settle: catching up with its place it runs a little over the pace.
+    tick(b,1)
+    const y0=s.y
+    expect(s.speed).toBeGreaterThan(UNITS[type].chargeSpeed-0.05)
+    expect(s.speed).toBeLessThan(UNITS[type].chargeSpeed*1.15)
+    expect(y0).toBeLessThan(215)
+    commandAttack(b,[rider.id],one(b,1,'sword',100,y0-40,N).id)
+    let sideways=0,turned=Infinity
+    for(let i=0;i<100;i++) {
+      step(b,0.05)
+      sideways=Math.max(sideways,Math.abs(s.x-100))
+      if(turned===Infinity&&Math.abs(angDiff(s.facing,S))<10*Math.PI/180) turned=(i+1)*0.05
+    }
+    expect(sideways).toBeLessThan(width)
+    expect(turned).toBeLessThan(seconds)
+  })
+})
+
+describe('slow cart traction: pushing over light foot from a standstill, held by a deep block',()=> {
+  /** One cart at rest, moved straight through a standing, braced block of militia `ranks` deep that never strikes. */
+  const through=(type:'chariot'|'heavyChariot',ranks:number)=> {
+    const b=createEmptyBattle(11),cart=one(b,0,type,100,100,0)
+    const foe=spawn(b,1,'militia','line',103.5,100,Math.PI,{models:10*ranks,files:10})
+    for(const s of foe.soldiers) s.meleeCd=1e9
+    cart.fireAtWill=false
+    const hp=foe.soldiers.reduce((n,s)=>n+s.hp,0),back=Math.max(...foe.soldiers.map(s=>s.x))
+    commandMove(b,[cart.id],130,100,null)
+    let knocked=0,passed=false
+    for(let i=0;i<300;i++) {
+      step(b,0.05)
+      knocked=Math.max(knocked,foe.soldiers.filter(s=>s.down>0).length)
+      passed||=cart.soldiers[0].x>back+2
+    }
+    return {passed,knocked,lost:hp-foe.soldiers.reduce((n,s)=>n+(s.alive?s.hp:0),0)}
+  }
+
+  it.each([['chariot',1],['chariot',4],['heavyChariot',1],['heavyChariot',4],['heavyChariot',6]] as const)('a %s at rest pushes over a %s-rank line and drives through it, unharmed',(type,ranks)=> {
+    const run=through(type,ranks)
+    expect(run.passed).toBe(true)
+    expect(run.knocked).toBeGreaterThan(0)
+    expect(run.lost).toBe(0)
+  })
+
+  it.each([['chariot',6],['chariot',8],['heavyChariot',8]] as const)('a %s at rest is held by a %s-rank block',(type,ranks)=> {
+    expect(through(type,ranks).passed).toBe(false)
+  })
+
+  // A charge runs on its momentum (RULES 四.7): spent among the men of a deep block, the carts are held there and push
+  // nobody over until they are ordered out. They used to grind on through the rest of the block at shove pace.
+  it.each([1,7,42])('a chariot regiment that spends its charge in a sword block is held there (seed %s)',seed=> {
+    const b=createEmptyBattle(seed)
+    const carts=spawn(b,0,'chariot','carts',100,40,Math.PI/2,scaledFormation('chariot',4))
+    const foe=spawn(b,1,'sword','foe',100,110,-Math.PI/2,scaledFormation('sword',4))
+    b.aiEnabled=false
+    commandAttack(b,[carts.id],foe.id)
+    const back=Math.max(...foe.soldiers.map(s=>s.y))
+    let deepest=0
+    for(let i=0;i<300;i++) {step(b,0.05);for(const s of carts.soldiers) if(s.alive) deepest=Math.max(deepest,s.y)}
+    expect(carts.soldiers.filter(s=>s.alive&&s.chargeSpent).length).toBeGreaterThanOrEqual(3)
+    expect(carts.bogged).toBe(true)
+    expect(deepest).toBeLessThan(back)
+    expect(battleErrors(b)).toEqual([])
+  },30000)
+})
+
+describe('rams run on momentum: how deep one charge goes',()=> {
+  const N=Math.PI/2,S=-Math.PI/2
+  /** One rammer at charge speed into the middle of a standing 6-rank, 20-file block, at its braced front or its back. */
+  const charge=(type:UnitType,foeType:UnitType,from:'front'|'rear')=> {
+    const b=createEmptyBattle(1),ram=one(b,0,type,100.3,30,N)
+    const block=spawn(b,1,foeType,'block',100,100,from==='front'?S:N,{...scaledFormation(foeType,4),files:20})
+    for(const s of block.soldiers) s.meleeCd=1e9
+    b.aiEnabled=false
+    tick(b,1)
+    commandAttack(b,[ram.id],block.id)
+    const edge=Math.min(...block.soldiers.map(s=>s.y)),r=ram.soldiers[0],rows=new Map<number,number>()
+    let started=-1,during=-1,deep=0
+    for(let i=0;i<400;i++) {
+      step(b,0.05)
+      for(const s of block.soldiers) if(s.down>0&&!rows.has(s.id)) rows.set(s.id,Math.round((s.prevY-edge)/UNITS[foeType].rankSpacing)+1)
+      if(started<0&&rows.size) started=b.time
+      if(started>=0&&during<0&&r.plowLeft<=0) {during=rows.size;deep=Math.max(...rows.values())}
+      if(started>=0&&b.time>started+4) break
+    }
+    expect(battleErrors(b)).toEqual([])
+    return {during,total:rows.size,deep}
+  }
+
+  // Calibration starting points to be tuned from play: a chariot has momentum for about four braced light infantry from
+  // the front and more from behind, heavy cavalry for two ranks from the front and more from behind.
+  it('a chariot throws a few braced light infantry from the front, more from behind, then its charge is spent',()=> {
+    const front=charge('chariot','militia','front'),rear=charge('chariot','militia','rear')
+    // About four, give or take the order the men are met in; it used to bowl over 15-30 and drive out of the far side.
+    expect(front.during).toBeGreaterThanOrEqual(3);expect(front.during).toBeLessThanOrEqual(8)
+    expect(rear.during).toBeGreaterThan(front.during)
+    // Spent among them it is stuck: nobody more goes down after its momentum is gone.
+    expect(front.total).toBeLessThanOrEqual(front.during+1)
+  },30000)
+
+  it('heavy cavalry knock down about two ranks from the front and more from behind',()=> {
+    const front=charge('heavyCavalry','militia','front'),rear=charge('heavyCavalry','militia','rear')
+    expect(front.during).toBeGreaterThanOrEqual(2);expect(front.deep).toBeLessThanOrEqual(2)
+    expect(rear.deep).toBeGreaterThan(front.deep)
+  },30000)
+
+  // A monster as wide as three men can still throw the men at its shoulders, who do not face it.
+  it.each(['chariot','heavyChariot','heavyCavalry','demigryph'] as UnitType[])('braced spears: a %s charging their front knocks no one down and cannot push in afterwards',type=> {
+    expect(charge(type,'spear','front').total).toBe(0)
+  },30000)
 })
